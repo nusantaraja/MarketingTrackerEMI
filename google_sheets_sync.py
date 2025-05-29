@@ -169,9 +169,21 @@ class GoogleSheetsSync:
                 return False
                 
             with open(file_path, 'r') as file:
-                data = yaml.safe_load(file)
-                if data is None: # Handle empty file
+                raw_data = yaml.safe_load(file)
+                if raw_data is None: # Handle empty file
                     data = [] if table_name != 'config' else {}
+                # Check if data is dict with expected key (e.g., {'activities': [...]})
+                elif isinstance(raw_data, dict) and table_name in raw_data:
+                    data = raw_data[table_name]
+                # Check if data is already a list (fallback or alternative structure)
+                elif isinstance(raw_data, list):
+                    data = raw_data
+                # Handle config separately if it's a dict without a root key matching table_name
+                elif isinstance(raw_data, dict) and table_name == 'config':
+                    data = raw_data
+                else:
+                    print(f"Warning: Unexpected YAML structure in {file_path}. Expected list or dict with key '{table_name}'.")
+                    data = [] # Default to empty list to avoid errors
 
             cell_list = worksheet.findall(f"=== {table_name.upper()} ===")
             if not cell_list:
