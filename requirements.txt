@@ -1,0 +1,8 @@
+streamlit
+pandas
+matplotlib
+plotly
+pyyaml
+bcrypt
+gspread>=5.0.0
+google-auth>=2.0.0
