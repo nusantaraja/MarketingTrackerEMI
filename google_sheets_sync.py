@@ -58,7 +58,8 @@ class GoogleSheetsSync:
     
     def get_current_month_tab_name(self):
         """Get the tab name for the current month."""
-        now = datetime.now(        return f"{now.strftime('%Y_%m')}"
+        now = datetime.now()
+        return f"{now.strftime('%Y_%m')}"
     
     def ensure_monthly_tab_exists(self):
         """Ensure that a tab exists for the current month."""
