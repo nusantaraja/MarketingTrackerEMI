@@ -53,6 +53,16 @@ EXPECTED_HEADERS = {
     ]
 }
 
+# Define date/timestamp columns for specific formatting
+DATE_COLUMNS = {
+    "marketing_activities": ['activity_date'],
+    "followups": ['followup_date', 'next_followup_date']
+}
+TIMESTAMP_COLUMNS = {
+    "marketing_activities": ['created_at', 'updated_at'],
+    "followups": ['created_at'],
+    "users": ['created_at']
+}
 
 class GoogleSheetsSync:
     def __init__(self, credentials_file=CREDENTIALS_FILE, spreadsheet_id=SPREADSHEET_ID):
@@ -228,6 +238,56 @@ class GoogleSheetsSync:
                 return None # Return None if conversion fails
         return None
 
+    def _format_value(self, value, header, table_name):
+        """Formats value based on header and table type for Google Sheets."""
+        # Handle None or empty strings
+        if value is None or value == '':
+            return ''
+        
+        # Phone number formatting
+        if table_name == 'marketing_activities' and header == 'contact_phone':
+            numeric_phone = self._clean_phone_number(str(value))
+            return numeric_phone if numeric_phone is not None else ''
+            
+        # Date formatting
+        if header in DATE_COLUMNS.get(table_name, []):
+            try:
+                # Attempt to parse if it's not already a string or handle potential datetime objects
+                if isinstance(value, datetime):
+                    return value.strftime('%Y-%m-%d')
+                # Try parsing common date formats from string
+                dt_obj = datetime.strptime(str(value).split(' ')[0], '%Y-%m-%d') # Handle potential time part
+                return dt_obj.strftime('%Y-%m-%d')
+            except ValueError:
+                print(f"Warning: Could not parse date '{value}' for header '{header}'. Sending as string.")
+                return str(value) # Send as string if parsing fails
+            except Exception as e:
+                 print(f"Warning: Error formatting date '{value}' for header '{header}': {e}. Sending as string.")
+                 return str(value)
+
+        # Timestamp formatting
+        if header in TIMESTAMP_COLUMNS.get(table_name, []):
+            try:
+                if isinstance(value, datetime):
+                    return value.strftime('%Y-%m-%d %H:%M:%S')
+                # Try parsing common timestamp formats
+                dt_obj = datetime.strptime(str(value), '%Y-%m-%d %H:%M:%S')
+                return dt_obj.strftime('%Y-%m-%d %H:%M:%S')
+            except ValueError:
+                 # Handle case where only date might be present
+                 try:
+                     dt_obj = datetime.strptime(str(value), '%Y-%m-%d')
+                     return dt_obj.strftime('%Y-%m-%d %H:%M:%S') # Add 00:00:00 time
+                 except ValueError:
+                     print(f"Warning: Could not parse timestamp '{value}' for header '{header}'. Sending as string.")
+                     return str(value)
+            except Exception as e:
+                 print(f"Warning: Error formatting timestamp '{value}' for header '{header}': {e}. Sending as string.")
+                 return str(value)
+
+        # Default: return as string
+        return str(value)
+
     def sync_data(self, table_name):
         """Sync data from a specific table's YAML file to its dedicated Google Sheet."""
         print(f"Starting sync for table: {table_name}")
@@ -365,18 +425,12 @@ class GoogleSheetsSync:
                         )
                         # Note: This generated ID is only for the sheet, not saved back to YAML
 
-                    # Prepare row values, converting phone number
+                    # Prepare row values, formatting specific columns
                     row_values = []
                     for header in expected_headers:
                         value = item.get(header, "")
-                        # FIXED: Handle phone number formatting
-                        if table_name == 'marketing_activities' and header == 'contact_phone':
-                            # Clean and convert to number, keep as None if invalid
-                            numeric_phone = self._clean_phone_number(str(value))
-                            row_values.append(numeric_phone if numeric_phone is not None else '') # Append number or empty string
-                        else:
-                            # Append other values as strings
-                            row_values.append(str(value))
+                        formatted_value = self._format_value(value, header, table_name)
+                        row_values.append(formatted_value)
                             
                     rows_to_append.append(row_values)
 
@@ -390,7 +444,7 @@ class GoogleSheetsSync:
                 print(
                     f"Appending {len(rows_to_append)} rows to sheet '{TABLE_MAP[table_name]}'."
                 )
-                # Use USER_ENTERED to allow Sheets to interpret numbers
+                # Use USER_ENTERED to allow Sheets to interpret numbers/dates correctly if pre-formatted
                 worksheet.append_rows(rows_to_append,
                                       value_input_option='USER_ENTERED',
                                       insert_data_option='INSERT_ROWS',
