@@ -5,52 +5,82 @@ import uuid
 from datetime import datetime
 import streamlit as st
 
-# Fungsi untuk membuat file YAML jika belum ada
+# Constants
+DATA_DIR = "data"
+ACTIVITIES_FILENAME = "marketing_activities.yaml"
+USERS_FILENAME = "users.yaml"
+FOLLOWUPS_FILENAME = "followups.yaml"
+CONFIG_FILENAME = "config.yaml"
+
+# --- File I/O --- 
+
 def create_yaml_if_not_exists(file_path, default_content):
     if not os.path.exists(file_path):
-        with open(file_path, 'w') as file:
-            yaml.dump(default_content, file)
+        os.makedirs(os.path.dirname(file_path), exist_ok=True)
+        with open(file_path, 'w', encoding='utf-8') as file:
+            yaml.dump(default_content, file, default_flow_style=False, allow_unicode=True)
+        print(f"Created default file: {file_path}")
 
-# Fungsi untuk membaca data dari file YAML
 def read_yaml(file_path):
     if os.path.exists(file_path):
-        with open(file_path, 'r') as file:
-            return yaml.safe_load(file)
+        try:
+            with open(file_path, 'r', encoding='utf-8') as file:
+                return yaml.safe_load(file)
+        except Exception as e:
+            print(f"Error reading YAML file {file_path}: {e}")
+            # Return a default structure or None based on expected usage
+            if ACTIVITIES_FILENAME in file_path:
+                return {"marketing_activities": []}
+            elif USERS_FILENAME in file_path:
+                return {"users": []}
+            elif FOLLOWUPS_FILENAME in file_path:
+                return {"followups": []}
+            elif CONFIG_FILENAME in file_path:
+                return {}
+            else:
+                return None
     return None
 
-# Fungsi untuk menulis data ke file YAML
 def write_yaml(file_path, data):
-    with open(file_path, 'w') as file:
-        yaml.dump(data, file)
+    try:
+        os.makedirs(os.path.dirname(file_path), exist_ok=True)
+        with open(file_path, 'w', encoding='utf-8') as file:
+            yaml.dump(data, file, default_flow_style=False, sort_keys=False, allow_unicode=True)
+    except Exception as e:
+        print(f"Error writing YAML file {file_path}: {e}")
+        st.error(f"Gagal menyimpan data ke {os.path.basename(file_path)}.")
 
-# Fungsi untuk hash password
+# --- Security --- 
+
 def hash_password(password):
     return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
 
-# Fungsi untuk verifikasi password
 def verify_password(password, hashed_password):
-    return bcrypt.checkpw(password.encode('utf-8'), hashed_password.encode('utf-8'))
+    try:
+        return bcrypt.checkpw(password.encode('utf-8'), hashed_password.encode('utf-8'))
+    except ValueError:
+        # Handle cases where the hash might be invalid (e.g., not bcrypt)
+        print(f"Warning: Invalid hash format encountered for password verification.")
+        return False
 
-# Fungsi untuk membuat ID unik
+# --- Utilities --- 
+
 def generate_id(prefix):
     return f"{prefix}-{uuid.uuid4().hex[:8]}"
 
-# Fungsi untuk mendapatkan timestamp saat ini
 def get_current_timestamp():
     return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-# Fungsi untuk inisialisasi file database
+# --- Database Initialization --- 
+
 def initialize_database():
-    # Direktori data
-    data_dir = "data"
-    if not os.path.exists(data_dir):
-        os.makedirs(data_dir)
-    
+    print("Initializing database files...")
     # File users.yaml
-    users_file = os.path.join(data_dir, "users.yaml")
+    users_file = os.path.join(DATA_DIR, USERS_FILENAME)
     default_users = {
         "users": [
             {
+                "id": generate_id("usr"), # Add ID for consistency
                 "username": "admin",
                 "password_hash": hash_password("admin123"),
                 "name": "Admin Utama",
@@ -63,71 +93,74 @@ def initialize_database():
     create_yaml_if_not_exists(users_file, default_users)
     
     # File marketing_activities.yaml
-    activities_file = os.path.join(data_dir, "marketing_activities.yaml")
-    default_activities = {"activities": []}
+    activities_file = os.path.join(DATA_DIR, ACTIVITIES_FILENAME)
+    default_activities = {"marketing_activities": []} 
     create_yaml_if_not_exists(activities_file, default_activities)
+    # Check and migrate old key if necessary
+    _migrate_activities_key(activities_file)
     
     # File followups.yaml
-    followups_file = os.path.join(data_dir, "followups.yaml")
+    followups_file = os.path.join(DATA_DIR, FOLLOWUPS_FILENAME)
     default_followups = {"followups": []}
     create_yaml_if_not_exists(followups_file, default_followups)
     
     # File config.yaml
-    config_file = os.path.join(data_dir, "config.yaml")
+    config_file = os.path.join(DATA_DIR, CONFIG_FILENAME)
+    # Using a simpler key-value structure for config as expected by sync module
     default_config = {
-        "app_settings": {
-            "app_name": "AI Suara Marketing Tracker",
-            "version": "1.0.0",
-            "theme": "light",
-            "date_format": "%Y-%m-%d %H:%M:%S"
-        },
-        "notification_settings": {
-            "enable_email": False,
-            "enable_reminder": True,
-            "reminder_days_before": 1
-        }
+        "app_name": "AI Suara Marketing Tracker",
+        "company_name": "AI Suara",
+        "version": "1.0.1", # Incremented version
+        "theme": "light",
+        "date_format": "%Y-%m-%d %H:%M:%S",
+        "enable_email": False,
+        "enable_reminder": True,
+        "reminder_days_before": 1
     }
     create_yaml_if_not_exists(config_file, default_config)
+    print("Database initialization complete.")
 
-# Fungsi untuk autentikasi pengguna
+# --- Migration Helper --- 
+
+def _migrate_activities_key(activities_file):
+    """Checks for old 'activities' key and migrates to 'marketing_activities'."""
+    activities_data = read_yaml(activities_file)
+    if activities_data and "activities" in activities_data and "marketing_activities" not in activities_data:
+        print(f"Migrating old 'activities' key to 'marketing_activities' in {activities_file}...")
+        activities_data["marketing_activities"] = activities_data.pop("activities")
+        write_yaml(activities_file, activities_data)
+        print("Migration complete.")
+        return True
+    return False
+
+# --- User Management --- 
+
 def authenticate_user(username, password):
-    users_file = os.path.join("data", "users.yaml")
+    users_file = os.path.join(DATA_DIR, USERS_FILENAME)
     users_data = read_yaml(users_file)
-    
     if not users_data or "users" not in users_data:
         return None
-    
     for user in users_data["users"]:
         if user["username"] == username and verify_password(password, user["password_hash"]):
             return user
-    
     return None
 
-# Fungsi untuk mendapatkan semua pengguna
 def get_all_users():
-    users_file = os.path.join("data", "users.yaml")
+    users_file = os.path.join(DATA_DIR, USERS_FILENAME)
     users_data = read_yaml(users_file)
-    
     if not users_data or "users" not in users_data:
         return []
-    
     return users_data["users"]
 
-# Fungsi untuk menambahkan pengguna baru
 def add_user(username, password, name, role, email):
-    users_file = os.path.join("data", "users.yaml")
+    users_file = os.path.join(DATA_DIR, USERS_FILENAME)
     users_data = read_yaml(users_file)
-    
-    if not users_data:
+    if not users_data or "users" not in users_data:
         users_data = {"users": []}
-    
-    # Cek apakah username sudah ada
-    for user in users_data["users"]:
-        if user["username"] == username:
-            return False, "Username sudah digunakan"
-    
-    # Tambahkan pengguna baru
+    if any(user["username"] == username for user in users_data["users"]):
+        return False, "Username sudah digunakan"
     new_user = {
+        "id": generate_id("usr"), # Add ID
         "username": username,
         "password_hash": hash_password(password),
         "name": name,
@@ -135,72 +168,49 @@ def add_user(username, password, name, role, email):
         "email": email,
         "created_at": get_current_timestamp()
     }
-    
     users_data["users"].append(new_user)
     write_yaml(users_file, users_data)
-    
     return True, "Pengguna berhasil ditambahkan"
 
-# Fungsi untuk menghapus pengguna
 def delete_user(username, current_user_username):
-    # Jika mencoba menghapus diri sendiri
     if username == current_user_username:
         return False, "Anda tidak dapat menghapus akun Anda sendiri"
-    
-    users_file = os.path.join("data", "users.yaml")
+    users_file = os.path.join(DATA_DIR, USERS_FILENAME)
     users_data = read_yaml(users_file)
-    
     if not users_data or "users" not in users_data:
         return False, "Data pengguna tidak ditemukan"
-    
-    # Cari pengguna yang akan dihapus
-    user_found = False
-    new_users_list = []
-    
-    for user in users_data["users"]:
-        if user["username"] == username:
-            user_found = True
-        else:
-            new_users_list.append(user)
-    
-    if not user_found:
+    initial_length = len(users_data["users"])
+    users_data["users"] = [user for user in users_data["users"] if user["username"] != username]
+    if len(users_data["users"]) == initial_length:
         return False, "Pengguna tidak ditemukan"
-    
-    # Update data pengguna
-    users_data["users"] = new_users_list
     write_yaml(users_file, users_data)
-    
     return True, f"Pengguna {username} berhasil dihapus"
 
-# Fungsi untuk mendapatkan semua aktivitas pemasaran
-def get_all_marketing_activities():
-    activities_file = os.path.join("data", "marketing_activities.yaml")
-    activities_data = read_yaml(activities_file)
-    
-    if not activities_data or "activities" not in activities_data:
-        return []
-    
-    return activities_data["activities"]
+# --- Marketing Activities --- 
 
-# Fungsi untuk mendapatkan aktivitas pemasaran berdasarkan username
+def get_all_marketing_activities():
+    activities_file = os.path.join(DATA_DIR, ACTIVITIES_FILENAME)
+    # Ensure migration check happens if needed
+    _migrate_activities_key(activities_file)
+    activities_data = read_yaml(activities_file)
+    if not activities_data or "marketing_activities" not in activities_data:
+        return []
+    return activities_data["marketing_activities"]
+
 def get_marketing_activities_by_username(username):
     activities = get_all_marketing_activities()
     return [activity for activity in activities if activity["marketer_username"] == username]
 
-# Fungsi untuk menambahkan aktivitas pemasaran baru
 def add_marketing_activity(marketer_username, prospect_name, prospect_location, 
                           contact_person, contact_position, contact_phone, 
                           contact_email, activity_date, activity_type, description):
-    activities_file = os.path.join("data", "marketing_activities.yaml")
+    activities_file = os.path.join(DATA_DIR, ACTIVITIES_FILENAME)
+    # Ensure migration check happens if needed
+    _migrate_activities_key(activities_file)
     activities_data = read_yaml(activities_file)
-    
-    if not activities_data:
-        activities_data = {"activities": []}
-    
-    # Buat ID baru
+    if not activities_data or "marketing_activities" not in activities_data:
+        activities_data = {"marketing_activities": []}
     activity_id = generate_id("act")
-    
-    # Tambahkan aktivitas baru
     new_activity = {
         "id": activity_id,
         "marketer_username": marketer_username,
@@ -210,113 +220,85 @@ def add_marketing_activity(marketer_username, prospect_name, prospect_location,
         "contact_position": contact_position,
         "contact_phone": contact_phone,
         "contact_email": contact_email,
-        "activity_date": activity_date,
+        "activity_date": str(activity_date), # Ensure date is string
         "activity_type": activity_type,
         "description": description,
         "status": "baru",
         "created_at": get_current_timestamp(),
         "updated_at": get_current_timestamp()
     }
-    
-    activities_data["activities"].append(new_activity)
+    activities_data["marketing_activities"].append(new_activity)
     write_yaml(activities_file, activities_data)
-    
     return True, "Aktivitas pemasaran berhasil ditambahkan", activity_id
 
-# Fungsi untuk mengedit aktivitas pemasaran
 def edit_marketing_activity(activity_id, prospect_name, prospect_location, 
                            contact_person, contact_position, contact_phone, 
                            contact_email, activity_date, activity_type, description, status):
-    activities_file = os.path.join("data", "marketing_activities.yaml")
+    activities_file = os.path.join(DATA_DIR, ACTIVITIES_FILENAME)
+    _migrate_activities_key(activities_file) # Ensure migration check
     activities_data = read_yaml(activities_file)
-    
-    if not activities_data or "activities" not in activities_data:
+    if not activities_data or "marketing_activities" not in activities_data:
         return False, "Data aktivitas tidak ditemukan"
-    
-    # Cari aktivitas yang akan diedit
     activity_found = False
-    
-    for activity in activities_data["activities"]:
+    for activity in activities_data["marketing_activities"]:
         if activity["id"] == activity_id:
             activity_found = True
-            
-            # Update data aktivitas
-            activity["prospect_name"] = prospect_name
-            activity["prospect_location"] = prospect_location
-            activity["contact_person"] = contact_person
-            activity["contact_position"] = contact_position
-            activity["contact_phone"] = contact_phone
-            activity["contact_email"] = contact_email
-            activity["activity_date"] = activity_date
-            activity["activity_type"] = activity_type
-            activity["description"] = description
-            activity["status"] = status
-            activity["updated_at"] = get_current_timestamp()
-            
+            activity.update({
+                "prospect_name": prospect_name,
+                "prospect_location": prospect_location,
+                "contact_person": contact_person,
+                "contact_position": contact_position,
+                "contact_phone": contact_phone,
+                "contact_email": contact_email,
+                "activity_date": str(activity_date), # Ensure date is string
+                "activity_type": activity_type,
+                "description": description,
+                "status": status,
+                "updated_at": get_current_timestamp()
+            })
             break
-    
     if not activity_found:
         return False, "Aktivitas tidak ditemukan"
-    
-    # Simpan perubahan
     write_yaml(activities_file, activities_data)
-    
     return True, "Aktivitas pemasaran berhasil diperbarui"
 
-# Fungsi untuk menghapus aktivitas pemasaran
 def delete_marketing_activity(activity_id):
-    activities_file = os.path.join("data", "marketing_activities.yaml")
+    activities_file = os.path.join(DATA_DIR, ACTIVITIES_FILENAME)
+    _migrate_activities_key(activities_file) # Ensure migration check
     activities_data = read_yaml(activities_file)
-    
-    if not activities_data or "activities" not in activities_data:
+    if not activities_data or "marketing_activities" not in activities_data:
         return False, "Data aktivitas tidak ditemukan"
-    
-    # Cari aktivitas yang akan dihapus
-    activity_found = False
-    new_activities_list = []
-    
-    for activity in activities_data["activities"]:
-        if activity["id"] == activity_id:
-            activity_found = True
-        else:
-            new_activities_list.append(activity)
-    
-    if not activity_found:
+    initial_length = len(activities_data["marketing_activities"])
+    activities_data["marketing_activities"] = [act for act in activities_data["marketing_activities"] if act["id"] != activity_id]
+    if len(activities_data["marketing_activities"]) == initial_length:
         return False, "Aktivitas tidak ditemukan"
-    
-    # Update data aktivitas
-    activities_data["activities"] = new_activities_list
     write_yaml(activities_file, activities_data)
-    
-    # Hapus juga semua follow-up terkait
-    followups_file = os.path.join("data", "followups.yaml")
+    # Delete related followups
+    followups_file = os.path.join(DATA_DIR, FOLLOWUPS_FILENAME)
     followups_data = read_yaml(followups_file)
-    
     if followups_data and "followups" in followups_data:
-        new_followups_list = [f for f in followups_data["followups"] if f["activity_id"] != activity_id]
-        followups_data["followups"] = new_followups_list
+        followups_data["followups"] = [f for f in followups_data["followups"] if f["activity_id"] != activity_id]
         write_yaml(followups_file, followups_data)
-    
     return True, "Aktivitas pemasaran berhasil dihapus"
 
-# Fungsi untuk memperbarui status aktivitas pemasaran
 def update_activity_status(activity_id, new_status):
-    activities_file = os.path.join("data", "marketing_activities.yaml")
+    activities_file = os.path.join(DATA_DIR, ACTIVITIES_FILENAME)
+    _migrate_activities_key(activities_file) # Ensure migration check
     activities_data = read_yaml(activities_file)
-    
-    if not activities_data or "activities" not in activities_data:
+    if not activities_data or "marketing_activities" not in activities_data:
         return False, "Data aktivitas tidak ditemukan"
-    
-    for activity in activities_data["activities"]:
+    activity_found = False
+    for activity in activities_data["marketing_activities"]:
         if activity["id"] == activity_id:
             activity["status"] = new_status
             activity["updated_at"] = get_current_timestamp()
-            write_yaml(activities_file, activities_data)
-            return True, "Status aktivitas berhasil diperbarui"
-    
-    return False, "Aktivitas tidak ditemukan"
+            activity_found = True
+            break
+    if not activity_found:
+        return False, "Aktivitas tidak ditemukan"
+    write_yaml(activities_file, activities_data)
+    return True, "Status aktivitas berhasil diperbarui"
 
-# Fungsi untuk mendapatkan aktivitas pemasaran berdasarkan ID
 def get_activity_by_id(activity_id):
     activities = get_all_marketing_activities()
     for activity in activities:
@@ -324,89 +306,84 @@ def get_activity_by_id(activity_id):
             return activity
     return None
 
-# Fungsi untuk mendapatkan semua follow-up
+# --- Follow-ups --- 
+
 def get_all_followups():
-    followups_file = os.path.join("data", "followups.yaml")
+    followups_file = os.path.join(DATA_DIR, FOLLOWUPS_FILENAME)
     followups_data = read_yaml(followups_file)
-    
     if not followups_data or "followups" not in followups_data:
         return []
-    
     return followups_data["followups"]
 
-# Fungsi untuk mendapatkan follow-up berdasarkan activity_id
 def get_followups_by_activity_id(activity_id):
     followups = get_all_followups()
     return [followup for followup in followups if followup["activity_id"] == activity_id]
 
-# Fungsi untuk mendapatkan follow-up berdasarkan username
 def get_followups_by_username(username):
     followups = get_all_followups()
     return [followup for followup in followups if followup["marketer_username"] == username]
 
-# Fungsi untuk menambahkan follow-up baru
 def add_followup(activity_id, marketer_username, followup_date, notes, 
                 next_action, next_followup_date, interest_level, status_update):
-    followups_file = os.path.join("data", "followups.yaml")
+    followups_file = os.path.join(DATA_DIR, FOLLOWUPS_FILENAME)
     followups_data = read_yaml(followups_file)
-    
-    if not followups_data:
+    if not followups_data or "followups" not in followups_data:
         followups_data = {"followups": []}
-    
-    # Buat ID baru
     followup_id = generate_id("fu")
-    
-    # Tambahkan follow-up baru
     new_followup = {
         "id": followup_id,
         "activity_id": activity_id,
         "marketer_username": marketer_username,
-        "followup_date": followup_date,
+        "followup_date": str(followup_date), # Ensure date is string
         "notes": notes,
         "next_action": next_action,
-        "next_followup_date": next_followup_date,
+        "next_followup_date": str(next_followup_date) if next_followup_date else None, # Ensure date is string or None
         "interest_level": interest_level,
         "status_update": status_update,
         "created_at": get_current_timestamp()
     }
-    
     followups_data["followups"].append(new_followup)
     write_yaml(followups_file, followups_data)
-    
-    # Update status aktivitas
+    # Update parent activity status
     update_activity_status(activity_id, status_update)
-    
     return True, "Follow-up berhasil ditambahkan"
 
-# Fungsi untuk mendapatkan konfigurasi aplikasi
+# --- Configuration --- 
+
 def get_app_config():
-    config_file = os.path.join("data", "config.yaml")
+    config_file = os.path.join(DATA_DIR, CONFIG_FILENAME)
     config_data = read_yaml(config_file)
-    
+    # Return default if file is missing or empty
     if not config_data:
-        return None
-    
+        print(f"Warning: Config file {config_file} not found or empty. Using defaults.")
+        return {
+            "app_name": "AI Suara Marketing Tracker",
+            "company_name": "AI Suara",
+            "version": "1.0.1",
+            "theme": "light",
+            "date_format": "%Y-%m-%d %H:%M:%S",
+            "enable_email": False,
+            "enable_reminder": True,
+            "reminder_days_before": 1
+        }
     return config_data
 
-# Fungsi untuk memperbarui konfigurasi aplikasi
-def update_app_config(config_data):
-    config_file = os.path.join("data", "config.yaml")
-    write_yaml(config_file, config_data)
+def update_app_config(new_config_subset):
+    config_file = os.path.join(DATA_DIR, CONFIG_FILENAME)
+    current_config = get_app_config() # Get current or default config
+    current_config.update(new_config_subset) # Update with new values
+    write_yaml(config_file, current_config)
     return True, "Konfigurasi berhasil diperbarui"
 
-# Fungsi untuk cek login - FIXED: Hanya mengembalikan user, bukan tuple
+# --- Authentication Flow --- 
+
 def check_login():
-    # Inisialisasi session state jika belum ada
     if 'logged_in' not in st.session_state:
         st.session_state.logged_in = False
-    
     if 'user' not in st.session_state:
         st.session_state.user = None
-    
-    # Mengembalikan user jika sudah login, None jika belum
     return st.session_state.user if st.session_state.logged_in else None
 
-# Fungsi untuk login
 def login(username, password):
     user = authenticate_user(username, password)
     if user:
@@ -415,7 +392,8 @@ def login(username, password):
         return True
     return False
 
-# Fungsi untuk logout
 def logout():
     st.session_state.logged_in = False
     st.session_state.user = None
+    st.rerun() # Rerun to go back to login page
+
