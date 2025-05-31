@@ -11,8 +11,7 @@ import os
 import gspread
 import yaml
 import pandas as pd
-from datetime import datetime, timedelta
-import pytz # Added for timezone conversion
+from datetime import datetime
 import streamlit as st
 import uuid  # For generating user IDs if missing
 import re # For cleaning phone numbers
@@ -22,9 +21,6 @@ import re # For cleaning phone numbers
 SPREADSHEET_ID = "1IRZ6iLmE62lPyiv8sJqLMQBH66fci7L-H9NuGiscMvo"
 CREDENTIALS_FILE = "service_account_key.json"
 DATA_DIR = "data"
-
-# Define WIB timezone
-WIB = pytz.timezone('Asia/Jakarta')
 
 # Map internal table names to actual Google Sheet names
 # Ensure these sheet names exactly match the tabs in your Google Sheet
@@ -242,63 +238,8 @@ class GoogleSheetsSync:
                 return None # Return None if conversion fails
         return None
 
-    def _parse_datetime(self, value):
-        """Attempts to parse a string into a datetime object, handling common formats."""
-        if isinstance(value, datetime):
-            return value
-        
-        # Handle potential Excel serial date numbers (float)
-        if isinstance(value, (float, int)):
-            try:
-                # Excel epoch starts Dec 30, 1899 (or Jan 1, 1900 depending on system)
-                # Using pandas to handle this conversion reliably
-                # Ensure pandas is imported as pd
-                # Note: This assumes the number represents days since the epoch.
-                # The fractional part represents the time.
-                # We need to be careful about the base date (1900 vs 1899)
-                # Let's assume the standard Excel epoch (1900-01-01 as day 1, but 1900 is incorrectly treated as leap year)
-                # A common workaround is to adjust for dates after Feb 28, 1900.
-                # However, pandas to_datetime with origin='1899-12-30', unit='D' handles this.
-                # Convert the float to a timedelta from the Excel epoch
-                excel_epoch = datetime(1899, 12, 30)
-                delta = timedelta(days=value)
-                dt_obj = excel_epoch + delta
-                print(f"Successfully parsed Excel serial date {value} to {dt_obj}")
-                return dt_obj
-            except Exception as e:
-                print(f"Warning: Could not parse numeric value {value} as Excel date: {e}")
-                return None # Failed to parse as Excel date
-
-        # Handle string parsing
-        if isinstance(value, str):
-            formats_to_try = [
-                '%Y-%m-%d %H:%M:%S.%f', # With microseconds
-                '%Y-%m-%d %H:%M:%S',    # Standard timestamp
-                '%Y-%m-%d',             # Date only
-                '%d/%m/%Y %H:%M:%S',    # Common alternative
-                '%d/%m/%Y',             # Common alternative date
-                '%m/%d/%Y %H:%M:%S',    # US format
-                '%m/%d/%Y',             # US date format
-            ]
-            for fmt in formats_to_try:
-                try:
-                    dt_obj = datetime.strptime(value, fmt)
-                    # Assume naive datetime needs localization if parsed from string without timezone
-                    # However, the source data might already be in a specific timezone (e.g., UTC)
-                    # For simplicity here, we'll treat parsed strings as potentially naive
-                    # and handle timezone conversion later if needed.
-                    print(f"Successfully parsed string '{value}' with format '{fmt}'")
-                    return dt_obj
-                except ValueError:
-                    continue # Try next format
-            print(f"Warning: Could not parse string '{value}' into datetime with known formats.")
-            return None # Failed to parse string
-        
-        print(f"Warning: Unhandled data type for datetime parsing: {type(value)}")
-        return None # Unhandled type
-
     def _format_value(self, value, header, table_name):
-        """Formats value based on header and table type for Google Sheets, ensuring yy-mm-dd format and WIB timezone for timestamps."""
+        """Formats value based on header and table type for Google Sheets."""
         # Handle None or empty strings
         if value is None or value == '':
             return ''
@@ -308,53 +249,41 @@ class GoogleSheetsSync:
             numeric_phone = self._clean_phone_number(str(value))
             return numeric_phone if numeric_phone is not None else ''
             
-        # Date formatting (Only format, no timezone conversion needed)
+        # Date formatting
         if header in DATE_COLUMNS.get(table_name, []):
-            dt_obj = self._parse_datetime(value)
-            if dt_obj:
-                try:
-                    # Format as yy-mm-dd (using %y for 2-digit year)
-                    formatted_date = dt_obj.strftime('%y-%m-%d')
-                    print(f"Formatted date '{value}' to '{formatted_date}'")
-                    return formatted_date
-                except Exception as e:
-                    print(f"Warning: Error formatting date object {dt_obj} for header '{header}': {e}. Sending as string.")
-                    return str(value) # Fallback
-            else:
+            try:
+                # Attempt to parse if it's not already a string or handle potential datetime objects
+                if isinstance(value, datetime):
+                    return value.strftime('%Y-%m-%d')
+                # Try parsing common date formats from string
+                dt_obj = datetime.strptime(str(value).split(' ')[0], '%Y-%m-%d') # Handle potential time part
+                return dt_obj.strftime('%Y-%m-%d')
+            except ValueError:
                 print(f"Warning: Could not parse date '{value}' for header '{header}'. Sending as string.")
-                return str(value) # Send as string if parsing failed
+                return str(value) # Send as string if parsing fails
+            except Exception as e:
+                 print(f"Warning: Error formatting date '{value}' for header '{header}': {e}. Sending as string.")
+                 return str(value)
 
-        # Timestamp formatting (Format AND Timezone Conversion to WIB)
+        # Timestamp formatting
         if header in TIMESTAMP_COLUMNS.get(table_name, []):
-            dt_obj = self._parse_datetime(value)
-            if dt_obj:
-                try:
-                    # 1. Assume the parsed datetime is naive UTC if it doesn't have tzinfo
-                    #    OR if it came from Excel serial (which has no inherent timezone)
-                    #    If it already has tzinfo, respect it.
-                    if dt_obj.tzinfo is None or isinstance(value, (float, int)):
-                        dt_utc = pytz.utc.localize(dt_obj)
-                        print(f"Localized naive datetime {dt_obj} to UTC: {dt_utc}")
-                    else:
-                        dt_utc = dt_obj.astimezone(pytz.utc)
-                        print(f"Converted timezone-aware datetime {dt_obj} to UTC: {dt_utc}")
-
-                    # 2. Convert UTC to WIB
-                    dt_wib = dt_utc.astimezone(WIB)
-                    print(f"Converted UTC datetime {dt_utc} to WIB: {dt_wib}")
-
-                    # 3. Format as yy-mm-dd (using %y for 2-digit year)
-                    #    Note: We are only storing the date part as requested.
-                    #    If you need time as well, use '%y-%m-%d %H:%M:%S'
-                    formatted_timestamp = dt_wib.strftime('%y-%m-%d') 
-                    print(f"Formatted WIB timestamp {dt_wib} to '{formatted_timestamp}'")
-                    return formatted_timestamp
-                except Exception as e:
-                    print(f"Warning: Error converting/formatting timestamp object {dt_obj} for header '{header}': {e}. Sending as string.")
-                    return str(value) # Fallback
-            else:
-                print(f"Warning: Could not parse timestamp '{value}' for header '{header}'. Sending as string.")
-                return str(value) # Send as string if parsing failed
+            try:
+                if isinstance(value, datetime):
+                    return value.strftime('%Y-%m-%d %H:%M:%S')
+                # Try parsing common timestamp formats
+                dt_obj = datetime.strptime(str(value), '%Y-%m-%d %H:%M:%S')
+                return dt_obj.strftime('%Y-%m-%d %H:%M:%S')
+            except ValueError:
+                 # Handle case where only date might be present
+                 try:
+                     dt_obj = datetime.strptime(str(value), '%Y-%m-%d')
+                     return dt_obj.strftime('%Y-%m-%d %H:%M:%S') # Add 00:00:00 time
+                 except ValueError:
+                     print(f"Warning: Could not parse timestamp '{value}' for header '{header}'. Sending as string.")
+                     return str(value)
+            except Exception as e:
+                 print(f"Warning: Error formatting timestamp '{value}' for header '{header}': {e}. Sending as string.")
+                 return str(value)
 
         # Default: return as string
         return str(value)
@@ -500,7 +429,6 @@ class GoogleSheetsSync:
                     row_values = []
                     for header in expected_headers:
                         value = item.get(header, "")
-                        # *** Call the updated formatting function ***
                         formatted_value = self._format_value(value, header, table_name)
                         row_values.append(formatted_value)
                             
@@ -726,137 +654,67 @@ def sync_on_data_change(table_name):
             st.error("Google Sheets connection not available. Cannot sync data.")
         return False
 
-def sync_all_on_demand():
-    """Sync all tables on demand (e.g., button click)."""
-    print("Sync all triggered on demand.")
+def sync_all():
+    """Sync all tables."""
     sync = get_sync_instance()
     if sync:
-        success, message = sync.sync_all_data()
-        return success, message
+        return sync.sync_all_data()
     else:
-        msg = "Google Sheets connection not available. Cannot sync."
-        print(msg)
-        if hasattr(st, 'secrets'): st.error(msg)
-        return False, msg
+        print("Sync instance not available. Cannot sync all.")
+        if hasattr(st, 'secrets'):
+            st.error("Google Sheets connection not available. Cannot sync all data.")
+        # Return False and an error message for consistency
+        return False, "Google Sheets connection not available."
 
-def restore_on_demand(table_name):
-    """Restore a specific table on demand."""
-    print(f"Restore triggered for table: {table_name}")
+def restore_table(table_name):
+    """Restore a specific table from Google Sheets."""
     sync = get_sync_instance()
     if sync:
-        success, message = sync.restore_data(table_name)
-        return success, message
+        return sync.restore_data(table_name)
     else:
-        msg = f"Google Sheets connection not available. Cannot restore {table_name}."
-        print(msg)
-        if hasattr(st, 'secrets'): st.error(msg)
-        return False, msg
+        print("Sync instance not available. Cannot restore table.")
+        if hasattr(st, 'secrets'):
+            st.error("Google Sheets connection not available. Cannot restore table.")
+        return False, "Google Sheets connection not available."
 
-def restore_all_on_demand():
-    """Restore all tables on demand."""
-    print("Restore all triggered on demand.")
+def restore_all(tab_name=None):
+    """Restore all tables from Google Sheets."""
     sync = get_sync_instance()
     if sync:
-        success, message = sync.restore_all_data()
-        return success, message
+        return sync.restore_all_data(tab_name=tab_name) # Pass tab_name
     else:
-        msg = "Google Sheets connection not available. Cannot restore all data."
-        print(msg)
-        if hasattr(st, 'secrets'): st.error(msg)
-        return False, msg
+        print("Sync instance not available. Cannot restore all.")
+        if hasattr(st, 'secrets'):
+            st.error("Google Sheets connection not available. Cannot restore all data.")
+        return False, "Google Sheets connection not available."
 
-# Example Usage (Optional - for testing)
+# Test block (for local execution, won't use Streamlit secrets)
 if __name__ == "__main__":
-    print("Running Google Sheets Sync Module directly (for testing)...")
-    
-    # Ensure DATA_DIR exists for potential restore operations
+    print("Running Google Sheets Sync Test (local mode, adapted for template)...")
+    # Ensure data directory exists for local testing
     if not os.path.exists(DATA_DIR):
         os.makedirs(DATA_DIR)
         print(f"Created data directory: {DATA_DIR}")
+        # Optionally create dummy YAML files if needed for testing
+        # with open(os.path.join(DATA_DIR, 'marketing_activities.yaml'), 'w') as f: yaml.dump({'marketing_activities': []}, f)
+        # with open(os.path.join(DATA_DIR, 'config.yaml'), 'w') as f: yaml.dump({'Key': 'app_name', 'Value': 'Test App'}, f)
 
-    # Create dummy YAML files if they don't exist for testing sync
-    dummy_activity = {
-        'marketing_activities': [
-            {
-                'id': 'act-test-001',
-                'marketer_username': 'testuser',
-                'prospect_name': 'Test Prospect Inc.',
-                'prospect_location': 'Test City',
-                'contact_person': 'Mr. Test',
-                'contact_position': 'Tester',
-                'contact_phone': '+1234567890',
-                'contact_email': 'test@example.com',
-                'activity_date': datetime.now().strftime('%Y-%m-%d'),
-                'activity_type': 'Call',
-                'description': 'Initial test call.',
-                'status': 'Open',
-                'created_at': datetime.now(), # Use datetime object
-                'updated_at': datetime.now()  # Use datetime object
-            }
-        ]
-    }
-    dummy_followup = {
-        'followups': [
-            {
-                'id': 'fol-test-001',
-                'activity_id': 'act-test-001',
-                'marketer_username': 'testuser',
-                'followup_date': (datetime.now() + timedelta(days=1)).strftime('%Y-%m-%d'),
-                'notes': 'Scheduled follow-up.',
-                'next_action': 'Send Proposal',
-                'next_followup_date': (datetime.now() + timedelta(days=7)).strftime('%Y-%m-%d'),
-                'interest_level': 'Medium',
-                'status_update': 'Scheduled',
-                'created_at': datetime.now() # Use datetime object
-            }
-        ]
-    }
-    dummy_user = {
-        'users': [
-            {
-                'id': 'usr-test-001',
-                'username': 'testuser',
-                'password_hash': 'dummyhash',
-                'name': 'Test User',
-                'role': 'Marketer',
-                'email': 'testuser@example.com',
-                'created_at': datetime.now() # Use datetime object
-            }
-        ]
-    }
-    dummy_config = {
-        'last_sync_time': str(datetime.now()),
-        'version': '1.0-test'
-    }
+    sync = GoogleSheetsSync()
+    if sync.client and sync.spreadsheet:
+        print("Connection successful!")
+        # Test getting current month tab name
+        print(f"Current month tab name: {sync.get_current_month_tab_name()}")
 
-    yaml_files = {
-        'marketing_activities.yaml': dummy_activity,
-        'followups.yaml': dummy_followup,
-        'users.yaml': dummy_user,
-        'config.yaml': dummy_config
-    }
+        # Test syncing one table (e.g., activities)
+        print("\nTesting sync_data for marketing_activities...")
+        # Ensure you have some data in data/marketing_activities.yaml for testing
+        sync_success = sync.sync_data("marketing_activities")
+        print(f"Sync result for marketing_activities: {sync_success}")
 
-    for filename, data in yaml_files.items():
-        filepath = os.path.join(DATA_DIR, filename)
-        if not os.path.exists(filepath):
-            try:
-                with open(filepath, 'w', encoding='utf-8') as f:
-                    yaml.dump(data, f, default_flow_style=False, allow_unicode=True)
-                print(f"Created dummy data file: {filepath}")
-            except Exception as e:
-                print(f"Error creating dummy file {filepath}: {e}")
-
-    # Get the sync instance
-    sync_instance = get_sync_instance()
-
-    if sync_instance:
-        print("\n--- Testing Sync All ---")
-        sync_success, sync_msg = sync_all_on_demand()
-        print(f"Sync All Result: Success={sync_success}, Message='{sync_msg}'")
-
-        # print("\n--- Testing Restore All ---")
-        # restore_success, restore_msg = restore_all_on_demand()
-        # print(f"Restore All Result: Success={restore_success}, Message='{restore_msg}'")
+        # Test restoring one table
+        # print("\nTesting restore_data for marketing_activities...")
+        # restore_success, restore_msg = sync.restore_data("marketing_activities")
+        # print(f"Restore result for marketing_activities: {restore_success} - {restore_msg}")
     else:
-        print("Could not get sync instance. Aborting tests.")
+        print("Connection failed! Check local credentials file and API access.")
 
