@@ -14,6 +14,7 @@ import pandas as pd
 from datetime import datetime
 import streamlit as st
 import uuid  # For generating user IDs if missing
+import re # For cleaning phone numbers
 
 # Constants
 # Use the user-provided ID
@@ -66,9 +67,6 @@ class GoogleSheetsSync:
         """Connect to Google Sheets API using Streamlit Secrets or local file."""
         # Avoid reconnecting if already connected
         if self.client and self.spreadsheet:
-            # Optionally add a check here to see if connection is still valid
-            # e.g., try self.spreadsheet.fetch_sheet_metadata()
-            # For simplicity, assume connection is valid if objects exist
             try:
                 # Simple check: list worksheets
                 self.spreadsheet.worksheets()
@@ -216,6 +214,20 @@ class GoogleSheetsSync:
                 st.error(f"Error accessing worksheet '{target_sheet_name}': {e}")
             return None
 
+    def _clean_phone_number(self, phone_str):
+        """Removes leading '+' and non-digit characters, returns integer or None."""
+        if not phone_str or not isinstance(phone_str, str):
+            return None
+        # Remove leading '+' and any non-digit characters
+        cleaned = re.sub(r'\D', '', phone_str.lstrip('+'))
+        if cleaned:
+            try:
+                return int(cleaned)
+            except ValueError:
+                print(f"Warning: Could not convert cleaned phone '{cleaned}' to integer.")
+                return None # Return None if conversion fails
+        return None
+
     def sync_data(self, table_name):
         """Sync data from a specific table's YAML file to its dedicated Google Sheet."""
         print(f"Starting sync for table: {table_name}")
@@ -353,11 +365,19 @@ class GoogleSheetsSync:
                         )
                         # Note: This generated ID is only for the sheet, not saved back to YAML
 
-                    # Ensure all are strings
-                    row_values = [
-                        str(item.get(header, ""))
-                        for header in expected_headers
-                    ]
+                    # Prepare row values, converting phone number
+                    row_values = []
+                    for header in expected_headers:
+                        value = item.get(header, "")
+                        # FIXED: Handle phone number formatting
+                        if table_name == 'marketing_activities' and header == 'contact_phone':
+                            # Clean and convert to number, keep as None if invalid
+                            numeric_phone = self._clean_phone_number(str(value))
+                            row_values.append(numeric_phone if numeric_phone is not None else '') # Append number or empty string
+                        else:
+                            # Append other values as strings
+                            row_values.append(str(value))
+                            
                     rows_to_append.append(row_values)
 
                 if not rows_to_append:
@@ -370,6 +390,7 @@ class GoogleSheetsSync:
                 print(
                     f"Appending {len(rows_to_append)} rows to sheet '{TABLE_MAP[table_name]}'."
                 )
+                # Use USER_ENTERED to allow Sheets to interpret numbers
                 worksheet.append_rows(rows_to_append,
                                       value_input_option='USER_ENTERED',
                                       insert_data_option='INSERT_ROWS',
@@ -498,7 +519,7 @@ class GoogleSheetsSync:
             if hasattr(st, 'secrets'): st.error(f"An unexpected error occurred while restoring {table_name}: {e}")
             return False, msg
 
-    def restore_all_data(self):
+    def restore_all_data(self, tab_name=None): # Added tab_name parameter, though not used here
         """Restore all tables from their dedicated Google Sheets."""
         if not self.spreadsheet:
             print("Not connected. Cannot restore all data.")
@@ -602,11 +623,11 @@ def restore_table(table_name):
             st.error("Google Sheets connection not available. Cannot restore table.")
         return False, "Google Sheets connection not available."
 
-def restore_all():
+def restore_all(tab_name=None):
     """Restore all tables from Google Sheets."""
     sync = get_sync_instance()
     if sync:
-        return sync.restore_all_data()
+        return sync.restore_all_data(tab_name=tab_name) # Pass tab_name
     else:
         print("Sync instance not available. Cannot restore all.")
         if hasattr(st, 'secrets'):

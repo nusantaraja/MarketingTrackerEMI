@@ -147,28 +147,24 @@ def manual_sync_all():
     """Manually trigger sync of all data to Google Sheets."""
     from google_sheets_sync import sync_all
     try:
-        results = sync_all()
-        success = all(results.values())
-        if success:
-            return True, "All data successfully synced to Google Sheets."
-        else:
-            failed = [table for table, result in results.items() if not result]
-            return False, f"Failed to sync some tables: {', '.join(failed)}"
+        # FIXED: Handle tuple return (success, message) instead of dict
+        success, message = sync_all()
+        # Return the success status and the message from sync_all
+        return success, message 
     except Exception as e:
+        # Return False and the error message if an exception occurs
         return False, f"Error syncing to Google Sheets: {e}"
 
 def manual_restore_all(tab_name=None):
     """Manually trigger restore of all data from Google Sheets."""
     from google_sheets_sync import restore_all
     try:
-        results = restore_all(tab_name)
-        success = all(results.values())
-        if success:
-            return True, "All data successfully restored from Google Sheets."
-        else:
-            failed = [table for table, result in results.items() if not result]
-            return False, f"Failed to restore some tables: {', '.join(failed)}"
+        # FIXED: Handle tuple return (success, message) instead of dict
+        success, message = restore_all(tab_name)
+        # Return the success status and the message from restore_all
+        return success, message
     except Exception as e:
+        # Return False and the error message if an exception occurs
         return False, f"Error restoring from Google Sheets: {e}"
 
 def get_available_tabs():
@@ -176,7 +172,7 @@ def get_available_tabs():
     from google_sheets_sync import get_sync_instance
     try:
         sync = get_sync_instance()
-        if not sync.connect():
+        if not sync or not sync.connect(): # Check if sync object exists before calling connect
             return False, "Failed to connect to Google Sheets.", []
         
         worksheets = sync.spreadsheet.worksheets()
@@ -184,3 +180,4 @@ def get_available_tabs():
         return True, "Successfully retrieved tab names.", tab_names
     except Exception as e:
         return False, f"Error getting tab names: {e}", []
+
