@@ -2,14 +2,17 @@
 > Aplikasi pencatatan aktivitas pemasaran untuk internal tim EKUITAS MEDIA INVESTAMA (EMI)
 
 <div style="display: flex; gap: 5px; flex-wrap: wrap;">
-  <span style="display: flex; align-items: center; color: #888;">└──</span>
-  [![License: MIT](https://img.shields.io/badge/License-MIT-blue)](LICENSE) 
+  <span style="display: flex; align-items: center; color: #888;">└──</span> 
+  [![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE) 
 
   <span style="display: flex; align-items: center; color: #888;">└──</span>
   [![Last Commit](https://img.shields.io/github/last-commit/nusantaraja/MarketingTrackerEMI?color=green)](https://github.com/nusantaraja/MarketingTrackerEMI/commits/main)
 
   <span style="display: flex; align-items: center; color: #888;">└──</span> 
   [![Repo Size](https://img.shields.io/github/repo-size/nusantaraja/MarketingTrackerEMI)]() 
+
+  <span style="display: flex; align-items: center; color: #888;">└──</span>
+  [![Contributions Welcome](https://img.shields.io/badge/contributions-welcome-brightgreen)](CONTRIBUTING.md) 
 </div>
 
 
@@ -128,3 +131,41 @@ Proyek ini dilisensikan di bawah MIT License. Lihat file LICENSE untuk detail se
 
 Dibuat dengan ❤️ oleh Tim IT Nusantaraja Group. 
 Jika kamu menyukai proyek ini, jangan ragu untuk star repositori ini atau berkontribusi!
+
+📢 Info Tambahan
+Proyek ini tidak memiliki demo online karena digunakan untuk kebutuhan internal perusahaan. 
+
+
+---
+
+### 📦 File Pendukung yang Harus Ada di Repo
+
+Agar tampilan dan fungsi bekerja sempurna, pastikan kamu punya file-file ini:
+
+| File                  | Fungsi |
+|-----------------------|--------|
+| `LICENSE`             | Lisensi MIT |
+| `CONTRIBUTING.md`     | Panduan kontribusi |
+| `.gitignore`          | Agar file sensitif tidak ikut diupload |
+| `icon.png` (opsional) | Ikon aplikasi (simpan di root repo) |
+
+Contoh isi `.gitignore`:
+
+```text
+# File sensitif
+service_account_key.json
+
+# Folder penyimpanan data
+data/
+
+# Cache Streamlit
+.streamlit/cache/
+
+# Environment
+venv/
+env/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.log
