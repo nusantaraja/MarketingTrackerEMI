@@ -113,9 +113,11 @@ Jangan upload file service_account_key.json ke repositori publik!
 Gunakan .gitignore untuk menyembunyikan file sensitif tersebut.
 Selalu pastikan struktur sheet di Google Sheets sesuai dengan yang diharapkan aplikasi.
 
+
 📄 Lisensi
 
 Proyek ini dilisensikan di bawah MIT License. Lihat file LICENSE untuk detail selengkapnya.
+
 
 ❤️ Terima Kasih
 
