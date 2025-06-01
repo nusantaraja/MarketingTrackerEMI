@@ -40,14 +40,16 @@ Aplikasi ini dibangun menggunakan **Streamlit (Python)** dan mendukung sinkronis
 ---
 
 ## 📁 Struktur Direktori
+```text
 MarketingTrackerEMI/
 │
-├── app_with_sheets.py # Main file aplikasi dengan integrasi Google Sheets
-├── google_sheets_sync.py # Modul sinkronisasi ke Google Sheets
+├── app_with_sheets.py       # Main file aplikasi dengan integrasi Google Sheets
+├── google_sheets_sync.py    # Modul sinkronisasi ke Google Sheets
 ├── service_account_key.json # Kunci Service Account Google Cloud (harus diisi)
-├── data/ # Folder penyimpanan data lokal (YAML)
+├── data/                    # Folder penyimpanan data lokal (YAML)
 ├── LICENSE
 └── README.md
+```
 
 ---
 
