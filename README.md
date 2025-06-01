@@ -85,6 +85,7 @@ dengan Spreadsheet ID milikmu.
 ```
 
 ▶️ Menjalankan Aplikasi
+
 Pastikan semua dependensi terinstal:
 
 ```python
