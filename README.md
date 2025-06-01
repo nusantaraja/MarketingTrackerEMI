@@ -3,8 +3,10 @@
 
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)   
 [![GitHub issues](https://img.shields.io/github/issues/nusantaraja/MarketingTrackerEMI)](https://github.com/nusantaraja/MarketingTrackerEMI/issues)   
-[![GitHub stars](https://img.shields.io/github/stars/nusantaraja/MarketingTrackerEMI?style=social)](https://github.com/nusantaraja/MarketingTrackerEMI)
 [![Repo Size](https://img.shields.io/github/repo-size/nusantaraja/MarketingTrackerEMI)]()
+
+[![GitHub stars](https://img.shields.io/github/stars/nusantaraja/MarketingTrackerEMI?style=social)](https://github.com/nusantaraja/MarketingTrackerEMI)
+
 
 ---
 
