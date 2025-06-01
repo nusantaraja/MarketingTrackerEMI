@@ -145,11 +145,9 @@ class GoogleSheetsSync:
                 )
             return False
 
-    # --- ADDED MISSING METHOD --- 
     def get_current_month_tab_name(self):
         """Returns the current month's tab name in YYYY_MM format."""
         return datetime.now().strftime("%Y_%m")
-    # --- END OF ADDED METHOD --- 
 
     def _verify_sheets_exist(self):
         """Verify that all required sheets exist in the spreadsheet."""
@@ -224,68 +222,62 @@ class GoogleSheetsSync:
                 st.error(f"Error accessing worksheet '{target_sheet_name}': {e}")
             return None
 
-    def _clean_phone_number(self, phone_str):
-        """Removes leading '+' and non-digit characters, returns integer or None."""
-        if not phone_str or not isinstance(phone_str, str):
-            return None
-        # Remove leading '+' and any non-digit characters
-        cleaned = re.sub(r'\D', '', phone_str.lstrip('+'))
-        if cleaned:
-            try:
-                return int(cleaned)
-            except ValueError:
-                print(f"Warning: Could not convert cleaned phone '{cleaned}' to integer.")
-                return None # Return None if conversion fails
-        return None
+    # Removed _clean_phone_number as it's no longer used for formatting output
 
     def _format_value(self, value, header, table_name):
-        """Formats value based on header and table type for Google Sheets."""
+        """Formats value based on header and table type for Google Sheets.
+           Forces dates/timestamps and phone numbers to be treated as text.
+        """
         # Handle None or empty strings
         if value is None or value == '':
             return ''
         
-        # Phone number formatting
+        # Phone number formatting: Return as string to preserve leading zeros
         if table_name == 'marketing_activities' and header == 'contact_phone':
-            numeric_phone = self._clean_phone_number(str(value))
-            return numeric_phone if numeric_phone is not None else ''
+            # Prepend single quote to force text format in Sheets
+            return "'" + str(value)
             
-        # Date formatting
+        # Date formatting: Format and prepend quote to force text
         if header in DATE_COLUMNS.get(table_name, []):
             try:
-                # Attempt to parse if it's not already a string or handle potential datetime objects
                 if isinstance(value, datetime):
-                    return value.strftime('%Y-%m-%d')
-                # Try parsing common date formats from string
-                dt_obj = datetime.strptime(str(value).split(' ')[0], '%Y-%m-%d') # Handle potential time part
-                return dt_obj.strftime('%Y-%m-%d')
+                    formatted_date = value.strftime('%Y-%m-%d')
+                else:
+                    # Try parsing common date formats from string
+                    dt_obj = datetime.strptime(str(value).split(' ')[0], '%Y-%m-%d') # Handle potential time part
+                    formatted_date = dt_obj.strftime('%Y-%m-%d')
+                return "'" + formatted_date # Prepend quote
             except ValueError:
-                print(f"Warning: Could not parse date '{value}' for header '{header}'. Sending as string.")
-                return str(value) # Send as string if parsing fails
+                print(f"Warning: Could not parse date '{value}' for header '{header}'. Sending as quoted string.")
+                return "'" + str(value) # Send as quoted string if parsing fails
             except Exception as e:
-                 print(f"Warning: Error formatting date '{value}' for header '{header}': {e}. Sending as string.")
-                 return str(value)
+                 print(f"Warning: Error formatting date '{value}' for header '{header}': {e}. Sending as quoted string.")
+                 return "'" + str(value)
 
-        # Timestamp formatting
+        # Timestamp formatting: Format and prepend quote to force text
         if header in TIMESTAMP_COLUMNS.get(table_name, []):
             try:
                 if isinstance(value, datetime):
-                    return value.strftime('%Y-%m-%d %H:%M:%S')
-                # Try parsing common timestamp formats
-                dt_obj = datetime.strptime(str(value), '%Y-%m-%d %H:%M:%S')
-                return dt_obj.strftime('%Y-%m-%d %H:%M:%S')
+                    formatted_ts = value.strftime('%Y-%m-%d %H:%M:%S')
+                else:
+                    # Try parsing common timestamp formats
+                    dt_obj = datetime.strptime(str(value), '%Y-%m-%d %H:%M:%S')
+                    formatted_ts = dt_obj.strftime('%Y-%m-%d %H:%M:%S')
+                return "'" + formatted_ts # Prepend quote
             except ValueError:
                  # Handle case where only date might be present
                  try:
                      dt_obj = datetime.strptime(str(value), '%Y-%m-%d')
-                     return dt_obj.strftime('%Y-%m-%d %H:%M:%S') # Add 00:00:00 time
+                     formatted_ts = dt_obj.strftime('%Y-%m-%d %H:%M:%S') # Add 00:00:00 time
+                     return "'" + formatted_ts # Prepend quote
                  except ValueError:
-                     print(f"Warning: Could not parse timestamp '{value}' for header '{header}'. Sending as string.")
-                     return str(value)
+                     print(f"Warning: Could not parse timestamp '{value}' for header '{header}'. Sending as quoted string.")
+                     return "'" + str(value)
             except Exception as e:
-                 print(f"Warning: Error formatting timestamp '{value}' for header '{header}': {e}. Sending as string.")
-                 return str(value)
+                 print(f"Warning: Error formatting timestamp '{value}' for header '{header}': {e}. Sending as quoted string.")
+                 return "'" + str(value)
 
-        # Default: return as string
+        # Default: return as string (without quote unless specified above)
         return str(value)
 
     def sync_data(self, table_name):
@@ -367,9 +359,10 @@ class GoogleSheetsSync:
                     values_to_update.append([str(key), str(value)])
 
                 worksheet.clear()
+                # Use USER_ENTERED here, formatting is handled by _format_value if needed
                 worksheet.update(f'A1:B{len(values_to_update)}',
                                  values_to_update,
-                                 value_input_option='USER_ENTERED')
+                                 value_input_option='USER_ENTERED') 
                 print(
                     f"Successfully synced {len(values_to_update)-1} config items."
                 )
@@ -395,6 +388,7 @@ class GoogleSheetsSync:
                         f"Sheet '{TABLE_MAP[table_name]}' appears empty. Writing headers first."
                     )
                     try:
+                        # Write headers normally
                         worksheet.update('A1',
                                          [expected_headers],
                                          value_input_option='USER_ENTERED')
@@ -425,7 +419,7 @@ class GoogleSheetsSync:
                         )
                         # Note: This generated ID is only for the sheet, not saved back to YAML
 
-                    # Prepare row values, formatting specific columns
+                    # Prepare row values, formatting specific columns using _format_value
                     row_values = []
                     for header in expected_headers:
                         value = item.get(header, "")
@@ -444,7 +438,7 @@ class GoogleSheetsSync:
                 print(
                     f"Appending {len(rows_to_append)} rows to sheet '{TABLE_MAP[table_name]}'."
                 )
-                # Use USER_ENTERED to allow Sheets to interpret numbers/dates correctly if pre-formatted
+                # Use USER_ENTERED. The prepended quote in _format_value handles text forcing.
                 worksheet.append_rows(rows_to_append,
                                       value_input_option='USER_ENTERED',
                                       insert_data_option='INSERT_ROWS',
@@ -543,7 +537,14 @@ class GoogleSheetsSync:
                 expected_keys = EXPECTED_HEADERS.get(table_name, [])
                 for record in sheet_data:
                     # Ensure all expected keys exist, even if empty
-                    processed_record = {key: str(record.get(key, "")) for key in expected_keys}
+                    # Remove the prepended quote if present from dates/timestamps/phones during restore
+                    processed_record = {}
+                    for key in expected_keys:
+                        value = str(record.get(key, ""))
+                        if value.startswith("'"):
+                            processed_record[key] = value[1:] # Remove leading quote
+                        else:
+                            processed_record[key] = value
                     restored_list.append(processed_record)
                 final_restored_data = {table_name: restored_list}
 
