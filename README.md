@@ -3,9 +3,9 @@
 
 [![License](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](LICENSE)  
 [![Last Commit](https://img.shields.io/github/last-commit/nusantaraja/MarketingTrackerEMI?color=green&style=flat-square)](https://github.com/nusantaraja/MarketingTrackerEMI/commits/main)  
-[![Repo Size](https://img.shields.io/github/repo-size/nusantaraja/MarketingTrackerEMI?style=flat-square)]()  
-[![GitHub Stars](https://img.shields.io/github/stars/nusantaraja/MarketingTrackerEMI?style=flat-square)](https://github.com/nusantaraja/MarketingTrackerEMI)  
+[![Repo Size](https://img.shields.io/github/repo-size/nusantaraja/MarketingTrackerEMI?style=flat-square)]()    
 [![Contributions Welcome](https://img.shields.io/badge/contributions-welcome-brightgreen?style=flat-square)](CONTRIBUTING.md)
+[![GitHub stars](https://img.shields.io/github/stars/nusantaraja/MarketingTrackerEMI?style=flat-square&logo=github)](https://github.com/nusantaraja/MarketingTrackerEMI)
 
 
 ---
