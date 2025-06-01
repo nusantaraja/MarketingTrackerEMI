@@ -1,14 +1,10 @@
 # EMI MARKETING TRACKER 💼📊  
 > Aplikasi pencatatan aktivitas pemasaran untuk internal tim EKUITAS MEDIA INVESTAMA (EMI)
 
-<div align="center">
-
-[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)   
-[![GitHub issues](https://img.shields.io/github/issues/nusantaraja/MarketingTrackerEMI)](https://github.com/nusantaraja/MarketingTrackerEMI/issues)   
-[![Repo Size](https://img.shields.io/github/repo-size/nusantaraja/MarketingTrackerEMI)]()   
-[![Contributions Welcome](https://img.shields.io/badge/contributions-welcome-brightgreen.svg)](CONTRIBUTING.md)   
-[![GitHub stars](https://img.shields.io/github/stars/nusantaraja/MarketingTrackerEMI?style=social)](https://github.com/nusantaraja/MarketingTrackerEMI)
-
+<div style="display: flex; gap: 10px;">
+  <span style="color: #888;">└──</span> [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) 
+  <span style="color: #888;">└──</span> [![Last Commit](https://img.shields.io/github/last-commit/nusantaraja/MarketingTrackerEMI?color=green)](https://github.com/nusantaraja/MarketingTrackerEMI/commits/main)
+  <span style="color: #888;">└──</span> [![Repo Size](https://img.shields.io/github/repo-size/nusantaraja/MarketingTrackerEMI)]() 
 </div>
 
 
