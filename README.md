@@ -82,16 +82,24 @@ Buka file `google_sheets_sync.py`, ganti baris:
 ```python
 SPREADSHEET_ID = "1SdEX5TzMzKfKcE1oCuaez2ctxgIxwwipkk9NT0jOYtI"
 dengan Spreadsheet ID milikmu.
+```
 
 ▶️ Menjalankan Aplikasi
 Pastikan semua dependensi terinstal:
+
+```python
 pip install streamlit pandas gspread google-auth pyyaml
+```
 
 Lalu jalankan aplikasi:
+
+```
 streamlit run app_with_sheets.py
+```
 
 Login sebagai superadmin untuk mengakses fitur sinkronisasi dan backup/restore.
-```
+
+
 
 🛡️ Keamanan
 Jangan upload file service_account_key.json ke repositori publik!
