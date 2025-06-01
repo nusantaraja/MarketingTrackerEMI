@@ -108,13 +108,16 @@ Login sebagai superadmin untuk mengakses fitur sinkronisasi dan backup/restore.
 
 
 🛡️ Keamanan
+
 Jangan upload file service_account_key.json ke repositori publik!
 Gunakan .gitignore untuk menyembunyikan file sensitif tersebut.
 Selalu pastikan struktur sheet di Google Sheets sesuai dengan yang diharapkan aplikasi.
 
 📄 Lisensi
+
 Proyek ini dilisensikan di bawah MIT License. Lihat file LICENSE untuk detail selengkapnya.
 
 ❤️ Terima Kasih
+
 Dibuat dengan ❤️ oleh Tim IT Nusantaraja Group
 Jika kamu menyukai proyek ini, jangan ragu untuk star repositori ini atau berkontribusi!
