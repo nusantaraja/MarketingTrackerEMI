@@ -1,19 +1,10 @@
 # EMI MARKETING TRACKER 💼📊  
 > Aplikasi pencatatan aktivitas pemasaran untuk internal tim EKUITAS MEDIA INVESTAMA (EMI)
 
-<div style="display: flex; gap: 5px; flex-wrap: wrap;">
-  <span style="display: flex; align-items: center; color: #888;">└──</span> 
-  [![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE) 
-
-  <span style="display: flex; align-items: center; color: #888;">└──</span>
-  [![Last Commit](https://img.shields.io/github/last-commit/nusantaraja/MarketingTrackerEMI?color=green)](https://github.com/nusantaraja/MarketingTrackerEMI/commits/main)
-
-  <span style="display: flex; align-items: center; color: #888;">└──</span> 
-  [![Repo Size](https://img.shields.io/github/repo-size/nusantaraja/MarketingTrackerEMI)]() 
-
-  <span style="display: flex; align-items: center; color: #888;">└──</span>
-  [![Contributions Welcome](https://img.shields.io/badge/contributions-welcome-brightgreen)](CONTRIBUTING.md) 
-</div>
+[![License](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](LICENSE)  
+[![Last Commit](https://img.shields.io/github/last-commit/nusantaraja/MarketingTrackerEMI?color=green&style=flat-square)](https://github.com/nusantaraja/MarketingTrackerEMI/commits/main)  
+[![Repo Size](https://img.shields.io/github/repo-size/nusantaraja/MarketingTrackerEMI?style=flat-square)]()  
+[![Contributions Welcome](https://img.shields.io/badge/contributions-welcome-brightgreen?style=flat-square)](CONTRIBUTING.md)
 
 
 ---
