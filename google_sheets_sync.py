@@ -12,6 +12,7 @@ import gspread
 import yaml
 import pandas as pd
 from datetime import datetime
+import pytz # Import pytz
 import streamlit as st
 import uuid  # For generating user IDs if missing
 import re # For cleaning phone numbers
@@ -21,6 +22,7 @@ import re # For cleaning phone numbers
 SPREADSHEET_ID = "1IRZ6iLmE62lPyiv8sJqLMQBH66fci7L-H9NuGiscMvo"
 CREDENTIALS_FILE = "service_account_key.json"
 DATA_DIR = "data"
+WIB_TZ = pytz.timezone("Asia/Bangkok") # Define WIB timezone (UTC+7)
 
 # Map internal table names to actual Google Sheet names
 # Ensure these sheet names exactly match the tabs in your Google Sheet
@@ -147,7 +149,9 @@ class GoogleSheetsSync:
 
     def get_current_month_tab_name(self):
         """Returns the current month's tab name in YYYY_MM format."""
-        return datetime.now().strftime("%Y_%m")
+        # Use WIB for consistency if needed, though only format matters here
+        now_wib = datetime.now(WIB_TZ)
+        return now_wib.strftime("%Y_%m")
 
     def _verify_sheets_exist(self):
         """Verify that all required sheets exist in the spreadsheet."""
@@ -222,11 +226,10 @@ class GoogleSheetsSync:
                 st.error(f"Error accessing worksheet '{target_sheet_name}': {e}")
             return None
 
-    # Removed _clean_phone_number as it's no longer used for formatting output
-
     def _format_value(self, value, header, table_name):
         """Formats value based on header and table type for Google Sheets.
            Forces dates/timestamps and phone numbers to be treated as text.
+           Ensures timestamps reflect WIB (as stored in YAML).
         """
         # Handle None or empty strings
         if value is None or value == '':
@@ -241,6 +244,7 @@ class GoogleSheetsSync:
         if header in DATE_COLUMNS.get(table_name, []):
             try:
                 if isinstance(value, datetime):
+                    # This case might not happen often if YAML stores strings
                     formatted_date = value.strftime('%Y-%m-%d')
                 else:
                     # Try parsing common date formats from string
@@ -254,25 +258,20 @@ class GoogleSheetsSync:
                  print(f"Warning: Error formatting date '{value}' for header '{header}': {e}. Sending as quoted string.")
                  return "'" + str(value)
 
-        # Timestamp formatting: Format and prepend quote to force text
+        # Timestamp formatting: Format (as WIB string from YAML) and prepend quote to force text
         if header in TIMESTAMP_COLUMNS.get(table_name, []):
             try:
-                if isinstance(value, datetime):
-                    formatted_ts = value.strftime('%Y-%m-%d %H:%M:%S')
-                else:
-                    # Try parsing common timestamp formats
-                    dt_obj = datetime.strptime(str(value), '%Y-%m-%d %H:%M:%S')
-                    formatted_ts = dt_obj.strftime('%Y-%m-%d %H:%M:%S')
-                return "'" + formatted_ts # Prepend quote
-            except ValueError:
-                 # Handle case where only date might be present
-                 try:
-                     dt_obj = datetime.strptime(str(value), '%Y-%m-%d')
-                     formatted_ts = dt_obj.strftime('%Y-%m-%d %H:%M:%S') # Add 00:00:00 time
-                     return "'" + formatted_ts # Prepend quote
-                 except ValueError:
-                     print(f"Warning: Could not parse timestamp '{value}' for header '{header}'. Sending as quoted string.")
-                     return "'" + str(value)
+                # Value from YAML should already be a WIB string like 'YYYY-MM-DD HH:MM:SS'
+                timestamp_str = str(value)
+                # Optional: Validate the format before sending?
+                try:
+                    datetime.strptime(timestamp_str, '%Y-%m-%d %H:%M:%S')
+                    # Format is valid, prepend quote
+                    return "'" + timestamp_str
+                except ValueError:
+                    print(f"Warning: Timestamp string '{timestamp_str}' from YAML for header '{header}' does not match expected format '%Y-%m-%d %H:%M:%S'. Sending as is (quoted).")
+                    return "'" + timestamp_str # Send as quoted string anyway
+
             except Exception as e:
                  print(f"Warning: Error formatting timestamp '{value}' for header '{header}': {e}. Sending as quoted string.")
                  return "'" + str(value)
@@ -285,14 +284,15 @@ class GoogleSheetsSync:
         print(f"Starting sync for table: {table_name}")
         worksheet = self._get_target_sheet(table_name)
         if not worksheet:
-            return False  # Error handled in _get_target_sheet
+            return False, f"Target sheet for {table_name} not found." # Return message
 
         file_path = os.path.join(DATA_DIR, f"{table_name}.yaml")
         if not os.path.exists(file_path):
             print(
                 f"Data file not found: {file_path}, skipping sync for {table_name}."
             )
-            return False
+            # Return True, message? Or False? Let's return False as data is missing.
+            return False, f"Data file {file_path} not found."
 
         # Read data from YAML, handling the root key structure
         data_to_sync = []
@@ -311,7 +311,7 @@ class GoogleSheetsSync:
                     print(
                         f"Warning: Expected dict structure for config.yaml, found {type(raw_data)}."
                     )
-                    return False  # Cannot sync invalid config format
+                    return False, "Invalid config.yaml format." # Return message
             elif isinstance(raw_data, dict) and table_name in raw_data:
                 data_to_sync = raw_data[table_name]
                 if not isinstance(data_to_sync, list):
@@ -329,13 +329,13 @@ class GoogleSheetsSync:
                 print(
                     f"Warning: Unexpected YAML structure in {file_path}. Cannot sync."
                 )
-                return False
+                return False, f"Unexpected YAML structure in {file_path}." # Return message
 
         except Exception as e:
             print(f"Error reading or parsing YAML file {file_path}: {e}")
             if hasattr(st, 'secrets'):
                 st.error(f"Error reading data file for {table_name}: {e}")
-            return False
+            return False, f"Error reading YAML file {file_path}." # Return message
 
         # Get the expected headers for this sheet
         expected_headers = EXPECTED_HEADERS.get(table_name)
@@ -344,7 +344,7 @@ class GoogleSheetsSync:
             if hasattr(st, 'secrets'):
                 st.error(f"Configuration error: Headers missing for {table_name}."
                          )
-            return False
+            return False, f"Headers missing for {table_name}." # Return message
 
         # --- Sync Logic --- 
         try:
@@ -363,9 +363,9 @@ class GoogleSheetsSync:
                 worksheet.update(f'A1:B{len(values_to_update)}',
                                  values_to_update,
                                  value_input_option='USER_ENTERED') 
-                print(
-                    f"Successfully synced {len(values_to_update)-1} config items."
-                )
+                msg = f"Successfully synced {len(values_to_update)-1} config items."
+                print(msg)
+                return True, msg # Return success and message
 
             else:
                 # Activities, Followups, Users: Append new data
@@ -373,10 +373,9 @@ class GoogleSheetsSync:
                     f"Syncing {table_name} data (append) to sheet '{TABLE_MAP[table_name]}'."
                 )
                 if not data_to_sync:  # Check if list is empty
-                    print(
-                        f"No data entries found in {file_path} for {table_name}. Nothing to append."
-                    )
-                    return True  # Not an error, just nothing to do
+                    msg = f"No data entries found in {file_path} for {table_name}. Nothing to append."
+                    print(msg)
+                    return True, msg  # Not an error, just nothing to do
 
                 # Check if sheet is empty or only has headers
                 all_vals = worksheet.get_all_values()
@@ -393,14 +392,13 @@ class GoogleSheetsSync:
                                          [expected_headers],
                                          value_input_option='USER_ENTERED')
                     except Exception as header_err:
-                        print(
-                            f"Error writing headers to empty sheet '{TABLE_MAP[table_name]}': {header_err}"
-                        )
+                        msg = f"Error writing headers to empty sheet '{TABLE_MAP[table_name]}': {header_err}"
+                        print(msg)
                         if hasattr(st, 'secrets'):
                             st.error(
                                 f"Could not initialize headers for sheet '{TABLE_MAP[table_name]}': {header_err}"
                             )
-                        return False  # Stop if headers can't be written
+                        return False, msg  # Stop if headers can't be written
 
                 # Prepare data rows in the correct order
                 rows_to_append = []
@@ -429,10 +427,9 @@ class GoogleSheetsSync:
                     rows_to_append.append(row_values)
 
                 if not rows_to_append:
-                    print(
-                        f"No valid data rows prepared for {table_name}. Nothing to append."
-                    )
-                    return True
+                    msg = f"No valid data rows prepared for {table_name}. Nothing to append."
+                    print(msg)
+                    return True, msg
 
                 # Append data rows to the sheet
                 print(
@@ -443,9 +440,8 @@ class GoogleSheetsSync:
                                       value_input_option='USER_ENTERED',
                                       insert_data_option='INSERT_ROWS',
                                       table_range='A1')  # Append after last row with data
-                print(
-                    f"Successfully appended {len(rows_to_append)} rows for {table_name}."
-                )
+                msg = f"Successfully appended {len(rows_to_append)} rows for {table_name}."
+                print(msg)
 
                 # **Important Limitation:** This append logic assumes that the YAML file *only* contains 
                 # *new* records since the last sync. If the YAML file contains *all* records, 
@@ -457,21 +453,22 @@ class GoogleSheetsSync:
                     st.warning(
                         f"Synced {table_name} by appending. Ensure YAML only contains new data to avoid duplicates."
                     )  # Inform user
-
-            return True  # Sync completed successfully
+                return True, msg # Return success and message
 
         except gspread.exceptions.APIError as e:
-            print(f"Google Sheets API Error syncing {table_name}: {e}")
+            msg = f"Google Sheets API Error syncing {table_name}: {e}"
+            print(msg)
             if hasattr(st, 'secrets'):
-                st.error(f"Google Sheets API Error syncing {table_name}: {e}")
-            return False
+                st.error(msg)
+            return False, msg # Return error and message
         except Exception as e:
-            print(f"Unexpected error during sync for {table_name}: {e}")
+            msg = f"Unexpected error during sync for {table_name}: {e}"
+            print(msg)
             if hasattr(st, 'secrets'):
                 st.error(
                     f"An unexpected error occurred while syncing {table_name}: {e}"
                 )
-            return False
+            return False, msg # Return error and message
 
     def sync_all_data(self):
         """Sync all tables based on the TABLE_MAP."""
@@ -485,28 +482,30 @@ class GoogleSheetsSync:
         if hasattr(st, 'secrets'): st.info("Starting sync for all tables...")
         all_success = True
         error_messages = []
+        success_messages = []
         for table_name in TABLE_MAP.keys():  # Iterate through internal names
             print(f"--- Syncing {table_name} to sheet '{TABLE_MAP[table_name]}' ---")
             # **CRITICAL CHANGE:** The current implementation syncs the *entire* YAML content.
             # For append-style sheets (Activities, Followups, Users), this will cause duplicates!
             # The sync_data function needs to be smarter (read sheet, compare, update/append).
             # For now, sticking to the simple (but potentially duplicate-creating) sync.
-            sync_success = self.sync_data(table_name)
+            sync_success, msg = self.sync_data(table_name)
             results[table_name] = sync_success
             print(f"--- Finished syncing {table_name} (Success: {sync_success}) ---")
-            if not sync_success:
+            if sync_success:
+                success_messages.append(f"{table_name}: {msg}")
+            else:
                 all_success = False
-                msg = f"Sync failed for table: {table_name}"
-                error_messages.append(msg)
-                if hasattr(st, 'secrets'): st.warning(msg)
+                error_messages.append(f"{table_name}: {msg}")
+                if hasattr(st, 'secrets'): st.warning(f"Sync failed for {table_name}: {msg}")
 
         print("Finished syncing all tables.")
         final_message = ""
         if all_success:
-            final_message = "Finished syncing all tables."
+            final_message = f"Finished syncing all tables. Details: {'; '.join(success_messages)}"
             if hasattr(st, 'secrets'): st.success(final_message)
         else:
-            final_message = f"Finished syncing all tables, but some tables failed: {', '.join(error_messages)}"
+            final_message = f"Finished syncing all tables, but some tables failed: {'; '.join(error_messages)}"
             if hasattr(st, 'secrets'): st.error(final_message)
         return all_success, final_message
 
@@ -586,12 +585,15 @@ class GoogleSheetsSync:
         if hasattr(st, 'secrets'): st.info(f"Starting restore for all tables from their dedicated sheets...")
         all_success = True
         error_messages = []
+        success_messages = []
         for table_name in TABLE_MAP.keys():
             print(f"--- Restoring {table_name} from sheet '{TABLE_MAP[table_name]}' ---")
             restore_success, msg = self.restore_data(table_name)
             results[table_name] = restore_success
             print(f"--- Finished restoring {table_name} (Success: {restore_success}) ---")
-            if not restore_success:
+            if restore_success:
+                success_messages.append(f"{table_name}: {msg}")
+            else:
                 all_success = False
                 error_messages.append(f"{table_name}: {msg}")
                 if hasattr(st, 'secrets'): st.warning(f"Restore failed for table: {table_name}")
@@ -599,10 +601,10 @@ class GoogleSheetsSync:
         print("Finished restoring all tables.")
         final_message = ""
         if all_success:
-            final_message = "Finished restoring all tables successfully."
+            final_message = f"Finished restoring all tables successfully. Details: {'; '.join(success_messages)}"
             if hasattr(st, 'secrets'): st.success(final_message)
         else:
-            final_message = f"Finished restoring all tables, but some tables failed: {', '.join(error_messages)}"
+            final_message = f"Finished restoring all tables, but some tables failed: {'; '.join(error_messages)}"
             if hasattr(st, 'secrets'): st.error(final_message)
         return all_success, final_message
 
@@ -640,14 +642,14 @@ def sync_on_data_change(table_name):
     print(f"Sync triggered for table: {table_name}")
     sync = get_sync_instance()
     if sync:
-        success = sync.sync_data(table_name)
+        success, msg = sync.sync_data(table_name)
         if success:
-            print(f"Sync completed for {table_name}.")
+            print(f"Sync completed for {table_name}: {msg}")
             # if hasattr(st, 'secrets'): st.toast(f"Data for {table_name} synced to Google Sheets.")
         else:
-            print(f"Sync failed for {table_name}.")
+            print(f"Sync failed for {table_name}: {msg}")
             if hasattr(st, 'secrets'):
-                st.error(f"Failed to sync data for {table_name} to Google Sheets.")
+                st.error(f"Failed to sync data for {table_name} to Google Sheets: {msg}")
         return success
     else:
         print("Sync instance not available. Cannot sync.")
@@ -709,8 +711,8 @@ if __name__ == "__main__":
         # Test syncing one table (e.g., activities)
         print("\nTesting sync_data for marketing_activities...")
         # Ensure you have some data in data/marketing_activities.yaml for testing
-        sync_success = sync.sync_data("marketing_activities")
-        print(f"Sync result for marketing_activities: {sync_success}")
+        sync_success, sync_msg = sync.sync_data("marketing_activities")
+        print(f"Sync result for marketing_activities: {sync_success} - {sync_msg}")
 
         # Test restoring one table
         # print("\nTesting restore_data for marketing_activities...")

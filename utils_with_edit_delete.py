@@ -3,6 +3,7 @@ import os
 import bcrypt
 import uuid
 from datetime import datetime
+import pytz # Import pytz
 import streamlit as st
 
 # Constants
@@ -11,20 +12,21 @@ ACTIVITIES_FILENAME = "marketing_activities.yaml"
 USERS_FILENAME = "users.yaml"
 FOLLOWUPS_FILENAME = "followups.yaml"
 CONFIG_FILENAME = "config.yaml"
+WIB_TZ = pytz.timezone("Asia/Bangkok") # Define WIB timezone (UTC+7)
 
 # --- File I/O --- 
 
 def create_yaml_if_not_exists(file_path, default_content):
     if not os.path.exists(file_path):
         os.makedirs(os.path.dirname(file_path), exist_ok=True)
-        with open(file_path, 'w', encoding='utf-8') as file:
+        with open(file_path, "w", encoding="utf-8") as file:
             yaml.dump(default_content, file, default_flow_style=False, allow_unicode=True)
         print(f"Created default file: {file_path}")
 
 def read_yaml(file_path):
     if os.path.exists(file_path):
         try:
-            with open(file_path, 'r', encoding='utf-8') as file:
+            with open(file_path, "r", encoding="utf-8") as file:
                 return yaml.safe_load(file)
         except Exception as e:
             print(f"Error reading YAML file {file_path}: {e}")
@@ -44,7 +46,7 @@ def read_yaml(file_path):
 def write_yaml(file_path, data):
     try:
         os.makedirs(os.path.dirname(file_path), exist_ok=True)
-        with open(file_path, 'w', encoding='utf-8') as file:
+        with open(file_path, "w", encoding="utf-8") as file:
             yaml.dump(data, file, default_flow_style=False, sort_keys=False, allow_unicode=True)
     except Exception as e:
         print(f"Error writing YAML file {file_path}: {e}")
@@ -53,11 +55,11 @@ def write_yaml(file_path, data):
 # --- Security --- 
 
 def hash_password(password):
-    return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+    return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
 
 def verify_password(password, hashed_password):
     try:
-        return bcrypt.checkpw(password.encode('utf-8'), hashed_password.encode('utf-8'))
+        return bcrypt.checkpw(password.encode("utf-8"), hashed_password.encode("utf-8"))
     except ValueError:
         # Handle cases where the hash might be invalid (e.g., not bcrypt)
         print(f"Warning: Invalid hash format encountered for password verification.")
@@ -69,7 +71,9 @@ def generate_id(prefix):
     return f"{prefix}-{uuid.uuid4().hex[:8]}"
 
 def get_current_timestamp():
-    return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    # Get current time in WIB
+    now_wib = datetime.now(WIB_TZ)
+    return now_wib.strftime("%Y-%m-%d %H:%M:%S") # Format as string
 
 # --- Database Initialization --- 
 
@@ -86,7 +90,7 @@ def initialize_database():
                 "name": "Admin Utama",
                 "role": "superadmin",
                 "email": "admin@example.com",
-                "created_at": get_current_timestamp()
+                "created_at": get_current_timestamp() # Use WIB timestamp
             }
         ]
     }
@@ -110,7 +114,7 @@ def initialize_database():
     default_config = {
         "app_name": "AI Suara Marketing Tracker",
         "company_name": "AI Suara",
-        "version": "1.0.1", # Incremented version
+        "version": "1.0.2", # Incremented version for timezone change
         "theme": "light",
         "date_format": "%Y-%m-%d %H:%M:%S",
         "enable_email": False,
@@ -123,7 +127,7 @@ def initialize_database():
 # --- Migration Helper --- 
 
 def _migrate_activities_key(activities_file):
-    """Checks for old 'activities' key and migrates to 'marketing_activities'."""
+    """Checks for old "activities" key and migrates to "marketing_activities"."""
     activities_data = read_yaml(activities_file)
     if activities_data and "activities" in activities_data and "marketing_activities" not in activities_data:
         print(f"Migrating old 'activities' key to 'marketing_activities' in {activities_file}...")
@@ -166,7 +170,7 @@ def add_user(username, password, name, role, email):
         "name": name,
         "role": role,
         "email": email,
-        "created_at": get_current_timestamp()
+        "created_at": get_current_timestamp() # Use WIB timestamp
     }
     users_data["users"].append(new_user)
     write_yaml(users_file, users_data)
@@ -211,6 +215,7 @@ def add_marketing_activity(marketer_username, prospect_name, prospect_location,
     if not activities_data or "marketing_activities" not in activities_data:
         activities_data = {"marketing_activities": []}
     activity_id = generate_id("act")
+    current_time_wib = get_current_timestamp() # Get WIB timestamp
     new_activity = {
         "id": activity_id,
         "marketer_username": marketer_username,
@@ -224,8 +229,8 @@ def add_marketing_activity(marketer_username, prospect_name, prospect_location,
         "activity_type": activity_type,
         "description": description,
         "status": "baru",
-        "created_at": get_current_timestamp(),
-        "updated_at": get_current_timestamp()
+        "created_at": current_time_wib, # Use WIB timestamp
+        "updated_at": current_time_wib # Use WIB timestamp
     }
     activities_data["marketing_activities"].append(new_activity)
     write_yaml(activities_file, activities_data)
@@ -254,7 +259,7 @@ def edit_marketing_activity(activity_id, prospect_name, prospect_location,
                 "activity_type": activity_type,
                 "description": description,
                 "status": status,
-                "updated_at": get_current_timestamp()
+                "updated_at": get_current_timestamp() # Use WIB timestamp for update
             })
             break
     if not activity_found:
@@ -291,7 +296,7 @@ def update_activity_status(activity_id, new_status):
     for activity in activities_data["marketing_activities"]:
         if activity["id"] == activity_id:
             activity["status"] = new_status
-            activity["updated_at"] = get_current_timestamp()
+            activity["updated_at"] = get_current_timestamp() # Use WIB timestamp for update
             activity_found = True
             break
     if not activity_found:
@@ -340,7 +345,7 @@ def add_followup(activity_id, marketer_username, followup_date, notes,
         "next_followup_date": str(next_followup_date) if next_followup_date else None, # Ensure date is string or None
         "interest_level": interest_level,
         "status_update": status_update,
-        "created_at": get_current_timestamp()
+        "created_at": get_current_timestamp() # Use WIB timestamp
     }
     followups_data["followups"].append(new_followup)
     write_yaml(followups_file, followups_data)
@@ -359,7 +364,7 @@ def get_app_config():
         return {
             "app_name": "AI Suara Marketing Tracker",
             "company_name": "AI Suara",
-            "version": "1.0.1",
+            "version": "1.0.2",
             "theme": "light",
             "date_format": "%Y-%m-%d %H:%M:%S",
             "enable_email": False,
@@ -378,9 +383,9 @@ def update_app_config(new_config_subset):
 # --- Authentication Flow --- 
 
 def check_login():
-    if 'logged_in' not in st.session_state:
+    if "logged_in" not in st.session_state:
         st.session_state.logged_in = False
-    if 'user' not in st.session_state:
+    if "user" not in st.session_state:
         st.session_state.user = None
     return st.session_state.user if st.session_state.logged_in else None
 
@@ -395,5 +400,7 @@ def login(username, password):
 def logout():
     st.session_state.logged_in = False
     st.session_state.user = None
-    st.rerun() # Rerun to go back to login page
+
+# Initialize database on first import/run
+# initialize_database()
 
