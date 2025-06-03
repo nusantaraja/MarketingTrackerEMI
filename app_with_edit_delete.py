@@ -491,8 +491,16 @@ def show_marketing_activities_page():
     username = user['username']
     role = user['role']
     
-    # Tab untuk lihat, tambah, edit, hapus
-    tab1, tab2, tab3, tab4 = st.tabs(["Lihat Aktivitas", "Tambah Aktivitas", "Edit Aktivitas", "Hapus Aktivitas"])
+    # Define tabs based on role
+    if role == 'superadmin':
+        tab_names = ["Lihat Aktivitas", "Tambah Aktivitas", "Edit Aktivitas", "Hapus Aktivitas"]
+        tabs = st.tabs(tab_names)
+        tab1, tab2, tab3, tab4 = tabs
+    else: # marketing role
+        tab_names = ["Lihat Aktivitas", "Tambah Aktivitas", "Edit Aktivitas"]
+        tabs = st.tabs(tab_names)
+        tab1, tab2, tab3 = tabs
+        tab4 = None # Assign None to tab4 for marketing role
     
     # Ambil data aktivitas
     if role == 'superadmin':
@@ -657,26 +665,28 @@ def show_marketing_activities_page():
         else:
             st.info("Tidak ada aktivitas untuk diedit.")
 
-    with tab4:
-        st.subheader("Hapus Aktivitas Pemasaran")
-        if not activities_df.empty:
-            activity_options = {f"{row['prospect_name']} ({row['activity_date'].strftime('%Y-%m-%d')}) - ID: {row['id']}": row['id'] 
-                              for index, row in activities_df.iterrows()}
-            selected_activity_display = st.selectbox("Pilih Aktivitas untuk Dihapus", options=list(activity_options.keys()))
-            
-            if selected_activity_display:
-                selected_activity_id = activity_options[selected_activity_display]
-                st.warning(f"Anda yakin ingin menghapus aktivitas untuk **{selected_activity_display.split(' (')[0]}** (ID: {selected_activity_id})? Tindakan ini tidak dapat dibatalkan dan akan menghapus semua follow-up terkait.")
+    # Only render tab4 content if it exists (i.e., user is superadmin)
+    if tab4:
+        with tab4:
+            st.subheader("Hapus Aktivitas Pemasaran")
+            if not activities_df.empty:
+                activity_options = {f"{row['prospect_name']} ({row['activity_date'].strftime('%Y-%m-%d')}) - ID: {row['id']}": row['id'] 
+                                  for index, row in activities_df.iterrows()}
+                selected_activity_display = st.selectbox("Pilih Aktivitas untuk Dihapus", options=list(activity_options.keys()), key="delete_activity_select") # Added key
                 
-                if st.button("Hapus Aktivitas Ini", type="primary", use_container_width=True):
-                    success, message = delete_marketing_activity(selected_activity_id)
-                    if success:
-                        st.success(message)
-                        st.rerun()
-                    else:
-                        st.error(message)
-        else:
-            st.info("Tidak ada aktivitas untuk dihapus.")
+                if selected_activity_display:
+                    selected_activity_id = activity_options[selected_activity_display]
+                    st.warning(f"Anda yakin ingin menghapus aktivitas untuk **{selected_activity_display.split(' (')[0]}** (ID: {selected_activity_id})? Tindakan ini tidak dapat dibatalkan dan akan menghapus semua follow-up terkait.")
+                    
+                    if st.button("Hapus Aktivitas Ini", type="primary", use_container_width=True, key="delete_activity_button"): # Added key
+                        success, message = delete_marketing_activity(selected_activity_id)
+                        if success:
+                            st.success(message)
+                            st.rerun()
+                        else:
+                            st.error(message)
+            else:
+                st.info("Tidak ada aktivitas untuk dihapus.")
 
 def show_followup_page():
     st.title("Follow-up Aktivitas")
@@ -1079,7 +1089,14 @@ def main():
     elif menu == "Manajemen Pengguna":
         show_user_management_page()
     elif menu == "Pengaturan":
-        show_settings_page() # Use the original settings page for now
+        # Use the settings page that includes Google Sheets integration
+        # Assuming app_with_sheets.py defines show_settings_page_with_sheets
+        try:
+            from app_with_sheets import show_settings_page_with_sheets
+            show_settings_page_with_sheets()
+        except ImportError:
+            st.error("Komponen pengaturan Google Sheets tidak ditemukan. Menggunakan pengaturan dasar.")
+            show_settings_page() # Fallback to basic settings page
     elif menu == "Profil":
         show_profile_page()
 
