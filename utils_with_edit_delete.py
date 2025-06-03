@@ -114,7 +114,7 @@ def initialize_database():
     default_config = {
         "app_name": "AI Suara Marketing Tracker",
         "company_name": "AI Suara",
-        "version": "1.0.2", # Incremented version for timezone change
+        "version": "1.0.3", # Incremented version for status add feature
         "theme": "light",
         "date_format": "%Y-%m-%d %H:%M:%S",
         "enable_email": False,
@@ -205,9 +205,10 @@ def get_marketing_activities_by_username(username):
     activities = get_all_marketing_activities()
     return [activity for activity in activities if activity["marketer_username"] == username]
 
+# Updated function signature to include status
 def add_marketing_activity(marketer_username, prospect_name, prospect_location, 
                           contact_person, contact_position, contact_phone, 
-                          contact_email, activity_date, activity_type, description):
+                          contact_email, activity_date, activity_type, description, status):
     activities_file = os.path.join(DATA_DIR, ACTIVITIES_FILENAME)
     # Ensure migration check happens if needed
     _migrate_activities_key(activities_file)
@@ -228,7 +229,7 @@ def add_marketing_activity(marketer_username, prospect_name, prospect_location,
         "activity_date": str(activity_date), # Ensure date is string
         "activity_type": activity_type,
         "description": description,
-        "status": "baru",
+        "status": status, # Use the status passed from the form
         "created_at": current_time_wib, # Use WIB timestamp
         "updated_at": current_time_wib # Use WIB timestamp
     }
@@ -364,7 +365,7 @@ def get_app_config():
         return {
             "app_name": "AI Suara Marketing Tracker",
             "company_name": "AI Suara",
-            "version": "1.0.2",
+            "version": "1.0.3",
             "theme": "light",
             "date_format": "%Y-%m-%d %H:%M:%S",
             "enable_email": False,
@@ -380,14 +381,7 @@ def update_app_config(new_config_subset):
     write_yaml(config_file, current_config)
     return True, "Konfigurasi berhasil diperbarui"
 
-# --- Authentication Flow --- 
-
-def check_login():
-    if "logged_in" not in st.session_state:
-        st.session_state.logged_in = False
-    if "user" not in st.session_state:
-        st.session_state.user = None
-    return st.session_state.user if st.session_state.logged_in else None
+# --- Session Management (Simplified) ---
 
 def login(username, password):
     user = authenticate_user(username, password)
@@ -401,6 +395,8 @@ def logout():
     st.session_state.logged_in = False
     st.session_state.user = None
 
-# Initialize database on first import/run
-# initialize_database()
+def check_login():
+    if st.session_state.get("logged_in", False):
+        return st.session_state.user
+    return None
 
