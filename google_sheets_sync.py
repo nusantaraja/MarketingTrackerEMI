@@ -5,7 +5,6 @@ This module handles synchronization between the local application data and Googl
 assuming dedicated sheets (
     'Activities', 'Followups', 'Users', 'Config') exist
 as per the provided template.
-Includes incremental sync logic to avoid duplicates.
 """
 
 import os
@@ -17,7 +16,6 @@ import pytz # Import pytz
 import streamlit as st
 import uuid  # For generating user IDs if missing
 import re # For cleaning phone numbers
-from utils_with_edit_delete import get_app_config, update_app_config # For last sync time
 
 # Constants
 # Use the user-provided ID
@@ -25,7 +23,6 @@ SPREADSHEET_ID = "1IRZ6iLmE62lPyiv8sJqLMQBH66fci7L-H9NuGiscMvo"
 CREDENTIALS_FILE = "service_account_key.json"
 DATA_DIR = "data"
 WIB_TZ = pytz.timezone("Asia/Bangkok") # Define WIB timezone (UTC+7)
-LAST_MANUAL_SYNC_KEY = "last_manual_sync_timestamp_wib"
 
 # Map internal table names to actual Google Sheet names
 # Ensure these sheet names exactly match the tabs in your Google Sheet
@@ -69,17 +66,6 @@ TIMESTAMP_COLUMNS = {
     "users": ['created_at']
 }
 
-# --- Helper to get last sync time --- 
-def get_last_manual_sync_time():
-    config = get_app_config()
-    return config.get(LAST_MANUAL_SYNC_KEY)
-
-# --- Helper to set last sync time --- 
-def set_last_manual_sync_time():
-    timestamp_str = datetime.now(WIB_TZ).strftime("%Y-%m-%d %H:%M:%S")
-    update_app_config({LAST_MANUAL_SYNC_KEY: timestamp_str})
-    print(f"Updated last manual sync time to: {timestamp_str}")
-
 class GoogleSheetsSync:
     def __init__(self, credentials_file=CREDENTIALS_FILE, spreadsheet_id=SPREADSHEET_ID):
         """Initialize the Google Sheets sync module."""
@@ -96,7 +82,7 @@ class GoogleSheetsSync:
             try:
                 # Simple check: list worksheets
                 self.spreadsheet.worksheets()
-                # print("Existing connection seems valid.") # Reduce noise
+                print("Existing connection seems valid.")
                 return True
             except Exception as conn_err:
                 print(f"Existing connection check failed: {conn_err}. Reconnecting...")
@@ -186,8 +172,8 @@ class GoogleSheetsSync:
                     st.warning(
                         f"The following required sheets are missing in your Google Sheet '{self.spreadsheet.title}': {', '.join(missing_sheets)}. Please ensure they exist and match the template."
                     )
-            # else:
-                # print("All required sheets found.") # Reduce noise
+            else:
+                print("All required sheets found.")
         except Exception as e:
             print(f"Error verifying sheets: {e}")
             if hasattr(st, 'secrets'):
@@ -223,7 +209,7 @@ class GoogleSheetsSync:
 
         try:
             worksheet = self.spreadsheet.worksheet(target_sheet_name)
-            # print(f"Accessed worksheet: '{target_sheet_name}'") # Reduce noise
+            print(f"Accessed worksheet: '{target_sheet_name}'")
             return worksheet
         except gspread.exceptions.WorksheetNotFound:
             print(
@@ -293,27 +279,22 @@ class GoogleSheetsSync:
         # Default: return as string (without quote unless specified above)
         return str(value)
 
-    def sync_data(self, table_name, incremental=False):
-        """Sync data from a specific table's YAML file to its dedicated Google Sheet.
-        
-        Args:
-            table_name (str): The internal name of the table to sync.
-            incremental (bool): If True, only append new records based on ID.
-                                If False (default), overwrite the sheet (used for config).
-        """
-        print(f"Starting sync for table: {table_name} (Incremental: {incremental})")
+    def sync_data(self, table_name):
+        """Sync data from a specific table's YAML file to its dedicated Google Sheet."""
+        print(f"Starting sync for table: {table_name}")
         worksheet = self._get_target_sheet(table_name)
         if not worksheet:
-            return False, f"Target sheet for {table_name} not found."
+            return False, f"Target sheet for {table_name} not found." # Return message
 
         file_path = os.path.join(DATA_DIR, f"{table_name}.yaml")
         if not os.path.exists(file_path):
             print(
                 f"Data file not found: {file_path}, skipping sync for {table_name}."
             )
+            # Return True, message? Or False? Let's return False as data is missing.
             return False, f"Data file {file_path} not found."
 
-        # Read data from YAML
+        # Read data from YAML, handling the root key structure
         data_to_sync = []
         config_data_dict = {}
         try:
@@ -330,15 +311,16 @@ class GoogleSheetsSync:
                     print(
                         f"Warning: Expected dict structure for config.yaml, found {type(raw_data)}."
                     )
-                    return False, "Invalid config.yaml format."
+                    return False, "Invalid config.yaml format." # Return message
             elif isinstance(raw_data, dict) and table_name in raw_data:
                 data_to_sync = raw_data[table_name]
                 if not isinstance(data_to_sync, list):
                     print(
                         f"Warning: Expected list under key '{table_name}' in {file_path}, found {type(data_to_sync)}."
                     )
-                    data_to_sync = []
+                    data_to_sync = []  # Treat as empty if structure is wrong
             elif isinstance(raw_data, list):
+                # Allow direct list structure as fallback?
                 print(
                     f"Warning: Reading direct list from {file_path}. Expected dict with key '{table_name}'."
                 )
@@ -347,59 +329,79 @@ class GoogleSheetsSync:
                 print(
                     f"Warning: Unexpected YAML structure in {file_path}. Cannot sync."
                 )
-                return False, f"Unexpected YAML structure in {file_path}."
+                return False, f"Unexpected YAML structure in {file_path}." # Return message
 
         except Exception as e:
             print(f"Error reading or parsing YAML file {file_path}: {e}")
             if hasattr(st, 'secrets'):
                 st.error(f"Error reading data file for {table_name}: {e}")
-            return False, f"Error reading YAML file {file_path}."
+            return False, f"Error reading YAML file {file_path}." # Return message
 
-        # Get the expected headers
+        # Get the expected headers for this sheet
         expected_headers = EXPECTED_HEADERS.get(table_name)
         if not expected_headers:
             print(f"Error: No expected headers defined for table '{table_name}'.")
             if hasattr(st, 'secrets'):
                 st.error(f"Configuration error: Headers missing for {table_name}."
                          )
-            return False, f"Headers missing for {table_name}."
+            return False, f"Headers missing for {table_name}." # Return message
 
         # --- Sync Logic --- 
         try:
             if table_name == 'config':
-                # Config: Always overwrite
+                # Config: Overwrite sheet with key-value pairs
                 print(
                     f"Syncing config data (overwrite) to sheet '{TABLE_MAP[table_name]}'."
                 )
                 values_to_update = [expected_headers]  # Start with header row
                 for key, value in config_data_dict.items():
+                    # Ensure strings
                     values_to_update.append([str(key), str(value)])
 
                 worksheet.clear()
+                # Use USER_ENTERED here, formatting is handled by _format_value if needed
                 worksheet.update(f'A1:B{len(values_to_update)}',
                                  values_to_update,
                                  value_input_option='USER_ENTERED') 
-                msg = f"Successfully synced {len(values_to_update)-1} config items (overwrite)."
+                msg = f"Successfully synced {len(values_to_update)-1} config items."
                 print(msg)
-                return True, msg
+                return True, msg # Return success and message
 
             else:
-                # Activities, Followups, Users: Overwrite or Incremental Append
-                if not data_to_sync:
-                    msg = f"No data entries found in {file_path} for {table_name}. Nothing to sync."
+                # Activities, Followups, Users: Append new data
+                print(
+                    f"Syncing {table_name} data (append) to sheet '{TABLE_MAP[table_name]}'."
+                )
+                if not data_to_sync:  # Check if list is empty
+                    msg = f"No data entries found in {file_path} for {table_name}. Nothing to append."
                     print(msg)
-                    # If overwriting, clear the sheet
-                    if not incremental:
-                         print(f"Clearing sheet '{TABLE_MAP[table_name]}' as part of overwrite sync.")
-                         worksheet.clear()
-                         worksheet.update('A1', [expected_headers], value_input_option='USER_ENTERED')
-                    return True, msg
+                    return True, msg  # Not an error, just nothing to do
 
-                # Prepare data rows from YAML
-                yaml_rows = []
-                yaml_ids = set()
-                id_column_index = expected_headers.index('id') if 'id' in expected_headers else -1
+                # Check if sheet is empty or only has headers
+                all_vals = worksheet.get_all_values()
+                # Consider empty or only header row
+                is_sheet_empty = len(all_vals) <= 1
 
+                if is_sheet_empty:
+                    print(
+                        f"Sheet '{TABLE_MAP[table_name]}' appears empty. Writing headers first."
+                    )
+                    try:
+                        # Write headers normally
+                        worksheet.update('A1',
+                                         [expected_headers],
+                                         value_input_option='USER_ENTERED')
+                    except Exception as header_err:
+                        msg = f"Error writing headers to empty sheet '{TABLE_MAP[table_name]}': {header_err}"
+                        print(msg)
+                        if hasattr(st, 'secrets'):
+                            st.error(
+                                f"Could not initialize headers for sheet '{TABLE_MAP[table_name]}': {header_err}"
+                            )
+                        return False, msg  # Stop if headers can't be written
+
+                # Prepare data rows in the correct order
+                rows_to_append = []
                 for item in data_to_sync:
                     if not isinstance(item, dict):
                         print(
@@ -407,103 +409,58 @@ class GoogleSheetsSync:
                         )
                         continue
 
-                    # Ensure ID exists (especially for users)
-                    if id_column_index != -1 and 'id' not in item:
-                        if table_name == 'users':
-                            item['id'] = f"usr-{uuid.uuid4().hex[:8]}"
-                            print(
-                                f"Generated missing ID for user: {item.get('username', 'N/A')} -> {item['id']}"
-                            )
-                        else:
-                             print(f"Warning: Skipping item in {table_name} due to missing ID: {item}")
-                             continue # Skip items without ID if ID is expected
-                    
-                    item_id = item.get('id') if id_column_index != -1 else None
-                    if item_id:
-                        yaml_ids.add(item_id)
+                    # Special handling for 'users' ID generation if missing
+                    if table_name == 'users' and 'id' not in item:
+                        item['id'] = f"usr-{uuid.uuid4().hex[:8]}"
+                        print(
+                            f"Generated missing ID for user: {item['username']} -> {item['id']}"
+                        )
+                        # Note: This generated ID is only for the sheet, not saved back to YAML
 
+                    # Prepare row values, formatting specific columns using _format_value
                     row_values = []
                     for header in expected_headers:
                         value = item.get(header, "")
                         formatted_value = self._format_value(value, header, table_name)
                         row_values.append(formatted_value)
-                    yaml_rows.append(row_values)
+                            
+                    rows_to_append.append(row_values)
 
-                if not yaml_rows:
-                    msg = f"No valid data rows prepared from YAML for {table_name}. Nothing to sync."
-                    print(msg)
-                    # If overwriting, clear the sheet
-                    if not incremental:
-                         print(f"Clearing sheet '{TABLE_MAP[table_name]}' as part of overwrite sync.")
-                         worksheet.clear()
-                         worksheet.update('A1', [expected_headers], value_input_option='USER_ENTERED')
-                    return True, msg
-
-                # --- Apply Sync Strategy --- 
-                if incremental and id_column_index != -1:
-                    # Incremental Append: Get existing IDs from sheet
-                    print(f"Performing incremental sync for {table_name}. Fetching existing IDs...")
-                    try:
-                        # Get only the ID column (assuming it's the first column, index 1)
-                        # Adjust col_index if 'id' is not the first column
-                        id_col_letter = gspread.utils.rowcol_to_a1(1, id_column_index + 1).rstrip('1')
-                        existing_ids_raw = worksheet.col_values(id_column_index + 1)
-                        # Skip header row and remove potential leading quotes from formatted IDs
-                        existing_ids = {str(id_val).lstrip("'") for id_val in existing_ids_raw[1:] if id_val}
-                        print(f"Found {len(existing_ids)} existing IDs in sheet '{TABLE_MAP[table_name]}'.")
-                    except Exception as e:
-                        msg = f"Error fetching existing IDs from sheet '{TABLE_MAP[table_name]}': {e}. Cannot perform incremental sync."
-                        print(msg)
-                        if hasattr(st, 'secrets'): st.error(msg)
-                        return False, msg
-
-                    # Filter YAML rows to find new ones
-                    rows_to_append = []
-                    for row in yaml_rows:
-                        row_id = str(row[id_column_index]).lstrip("'") # Get ID from formatted row
-                        if row_id not in existing_ids:
-                            rows_to_append.append(row)
-                    
-                    if not rows_to_append:
-                        msg = f"No new records found in YAML for {table_name} to append incrementally."
-                        print(msg)
-                        return True, msg
-                    
-                    # Append only the new rows
-                    print(
-                        f"Appending {len(rows_to_append)} new rows incrementally to sheet '{TABLE_MAP[table_name]}'."
-                    )
-                    worksheet.append_rows(rows_to_append,
-                                          value_input_option='USER_ENTERED',
-                                          insert_data_option='INSERT_ROWS',
-                                          table_range='A1')
-                    msg = f"Successfully appended {len(rows_to_append)} new rows for {table_name} incrementally."
+                if not rows_to_append:
+                    msg = f"No valid data rows prepared for {table_name}. Nothing to append."
                     print(msg)
                     return True, msg
 
-                else:
-                    # Overwrite Sync
-                    print(
-                        f"Performing overwrite sync for {table_name} with {len(yaml_rows)} rows."
-                    )
-                    worksheet.clear()
-                    # Prepare data including headers
-                    data_to_write = [expected_headers] + yaml_rows
-                    # Determine range dynamically
-                    end_cell = gspread.utils.rowcol_to_a1(len(data_to_write), len(expected_headers))
-                    worksheet.update(f'A1:{end_cell}',
-                                     data_to_write,
-                                     value_input_option='USER_ENTERED')
-                    msg = f"Successfully synced {len(yaml_rows)} rows for {table_name} (overwrite)."
-                    print(msg)
-                    return True, msg
+                # Append data rows to the sheet
+                print(
+                    f"Appending {len(rows_to_append)} rows to sheet '{TABLE_MAP[table_name]}'."
+                )
+                # Use USER_ENTERED. The prepended quote in _format_value handles text forcing.
+                worksheet.append_rows(rows_to_append,
+                                      value_input_option='USER_ENTERED',
+                                      insert_data_option='INSERT_ROWS',
+                                      table_range='A1')  # Append after last row with data
+                msg = f"Successfully appended {len(rows_to_append)} rows for {table_name}."
+                print(msg)
+
+                # **Important Limitation:** This append logic assumes that the YAML file *only* contains 
+                # *new* records since the last sync. If the YAML file contains *all* records, 
+                # this will create duplicates in the sheet. 
+                # A more robust sync would require reading existing IDs from the sheet 
+                # and only appending/updating records that are new or changed.
+                # For now, we proceed with the simple append as requested by the apparent need.
+                if hasattr(st, 'secrets'):
+                    st.warning(
+                        f"Synced {table_name} by appending. Ensure YAML only contains new data to avoid duplicates."
+                    )  # Inform user
+                return True, msg # Return success and message
 
         except gspread.exceptions.APIError as e:
             msg = f"Google Sheets API Error syncing {table_name}: {e}"
             print(msg)
             if hasattr(st, 'secrets'):
                 st.error(msg)
-            return False, msg
+            return False, msg # Return error and message
         except Exception as e:
             msg = f"Unexpected error during sync for {table_name}: {e}"
             print(msg)
@@ -511,31 +468,28 @@ class GoogleSheetsSync:
                 st.error(
                     f"An unexpected error occurred while syncing {table_name}: {e}"
                 )
-            return False, msg
+            return False, msg # Return error and message
 
-    def sync_all_data(self, incremental=False):
-        """Sync all tables based on the TABLE_MAP.
-        
-        Args:
-            incremental (bool): If True, use incremental append for Activities, Followups, Users.
-                                Config is always overwritten.
-        """
+    def sync_all_data(self):
+        """Sync all tables based on the TABLE_MAP."""
         if not self.spreadsheet:
             print("Not connected. Cannot sync all data.")
             if not self.connect(): return False, "Failed to connect"
             if not self.spreadsheet: return False, "Spreadsheet object missing after connect"
 
         results = {}
-        print(f"Starting sync for all mapped tables... (Incremental: {incremental})")
-        if hasattr(st, 'secrets'): st.info(f"Starting sync for all tables... (Incremental: {incremental})")
+        print("Starting sync for all mapped tables...")
+        if hasattr(st, 'secrets'): st.info("Starting sync for all tables...")
         all_success = True
         error_messages = []
         success_messages = []
-        for table_name in TABLE_MAP.keys():
+        for table_name in TABLE_MAP.keys():  # Iterate through internal names
             print(f"--- Syncing {table_name} to sheet '{TABLE_MAP[table_name]}' ---")
-            # Determine sync type for this table
-            is_incremental = incremental and table_name != 'config'
-            sync_success, msg = self.sync_data(table_name, incremental=is_incremental)
+            # **CRITICAL CHANGE:** The current implementation syncs the *entire* YAML content.
+            # For append-style sheets (Activities, Followups, Users), this will cause duplicates!
+            # The sync_data function needs to be smarter (read sheet, compare, update/append).
+            # For now, sticking to the simple (but potentially duplicate-creating) sync.
+            sync_success, msg = self.sync_data(table_name)
             results[table_name] = sync_success
             print(f"--- Finished syncing {table_name} (Success: {sync_success}) ---")
             if sync_success:
@@ -550,8 +504,6 @@ class GoogleSheetsSync:
         if all_success:
             final_message = f"Finished syncing all tables. Details: {'; '.join(success_messages)}"
             if hasattr(st, 'secrets'): st.success(final_message)
-            # Update last sync time only if all tables succeeded
-            set_last_manual_sync_time()
         else:
             final_message = f"Finished syncing all tables, but some tables failed: {'; '.join(error_messages)}"
             if hasattr(st, 'secrets'): st.error(final_message)
@@ -577,9 +529,14 @@ class GoogleSheetsSync:
                 final_restored_data = restored_data_dict
             else:
                 # For other tables, the structure is { 'table_name': [...] }
+                # Ensure data types are handled correctly if needed (e.g., numbers)
+                # For now, keep as strings as read by get_all_records
+                # Convert keys to lowercase to match YAML expectations if needed
                 restored_list = []
                 expected_keys = EXPECTED_HEADERS.get(table_name, [])
                 for record in sheet_data:
+                    # Ensure all expected keys exist, even if empty
+                    # Remove the prepended quote if present from dates/timestamps/phones during restore
                     processed_record = {}
                     for key in expected_keys:
                         value = str(record.get(key, ""))
@@ -651,34 +608,116 @@ class GoogleSheetsSync:
             if hasattr(st, 'secrets'): st.error(final_message)
         return all_success, final_message
 
-    def get_available_tabs(self):
-        """Get a list of all worksheet names in the spreadsheet."""
-        if not self.spreadsheet:
-            print("Not connected. Cannot get available tabs.")
-            if not self.connect(): return False, "Failed to connect", []
-            if not self.spreadsheet: return False, "Spreadsheet object missing after connect", []
-        try:
-            tabs = [sheet.title for sheet in self.spreadsheet.worksheets()]
-            return True, "Successfully retrieved tabs", tabs
-        except Exception as e:
-            msg = f"Error getting available tabs: {e}"
-            print(msg)
-            if hasattr(st, 'secrets'): st.error(msg)
-            return False, msg, []
+# --- Singleton Instance and Helper Functions ---
 
-# --- Singleton Instance --- 
-_sync_instance = None
+_instance = None
 
 def get_sync_instance():
     """Get the singleton instance of GoogleSheetsSync."""
-    global _sync_instance
-    if _sync_instance is None:
-        print("Creating new GoogleSheetsSync instance...")
-        _sync_instance = GoogleSheetsSync()
-    # Always try to ensure connection is active
-    elif not _sync_instance.connect():
-        print("Failed to ensure connection for existing instance.")
-        # Optionally, try recreating the instance if connection fails persistently
-        # _sync_instance = GoogleSheetsSync()
-    return _sync_instance
+    global _instance
+    if _instance is None:
+        print("Initializing GoogleSheetsSync instance...")
+        try:
+            _instance = GoogleSheetsSync()
+            if not _instance.client or not _instance.spreadsheet:
+                print("Failed to establish connection during initial instance creation.")
+                _instance = None
+        except Exception as e:
+            print(f"Failed to initialize GoogleSheetsSync instance: {e}")
+            if hasattr(st, 'secrets'):
+                st.error(f"Failed to initialize Google Sheets connection: {e}")
+            _instance = None
+    elif _instance and (not _instance.client or not _instance.spreadsheet):
+        print("Re-attempting connection for existing instance...")
+        if not _instance.connect():
+            print("Failed to re-establish connection.")
+
+    return _instance
+
+def sync_on_data_change(table_name):
+    """Sync a specific table when data changes."""
+    # This function now syncs the *entire* current state of the YAML 
+    # to the corresponding sheet using the logic in sync_data 
+    # (overwrite for config, append for others).
+    print(f"Sync triggered for table: {table_name}")
+    sync = get_sync_instance()
+    if sync:
+        success, msg = sync.sync_data(table_name)
+        if success:
+            print(f"Sync completed for {table_name}: {msg}")
+            # if hasattr(st, 'secrets'): st.toast(f"Data for {table_name} synced to Google Sheets.")
+        else:
+            print(f"Sync failed for {table_name}: {msg}")
+            if hasattr(st, 'secrets'):
+                st.error(f"Failed to sync data for {table_name} to Google Sheets: {msg}")
+        return success
+    else:
+        print("Sync instance not available. Cannot sync.")
+        if hasattr(st, 'secrets'):
+            st.error("Google Sheets connection not available. Cannot sync data.")
+        return False
+
+def sync_all():
+    """Sync all tables."""
+    sync = get_sync_instance()
+    if sync:
+        return sync.sync_all_data()
+    else:
+        print("Sync instance not available. Cannot sync all.")
+        if hasattr(st, 'secrets'):
+            st.error("Google Sheets connection not available. Cannot sync all data.")
+        # Return False and an error message for consistency
+        return False, "Google Sheets connection not available."
+
+def restore_table(table_name):
+    """Restore a specific table from Google Sheets."""
+    sync = get_sync_instance()
+    if sync:
+        return sync.restore_data(table_name)
+    else:
+        print("Sync instance not available. Cannot restore table.")
+        if hasattr(st, 'secrets'):
+            st.error("Google Sheets connection not available. Cannot restore table.")
+        return False, "Google Sheets connection not available."
+
+def restore_all(tab_name=None):
+    """Restore all tables from Google Sheets."""
+    sync = get_sync_instance()
+    if sync:
+        return sync.restore_all_data(tab_name=tab_name) # Pass tab_name
+    else:
+        print("Sync instance not available. Cannot restore all.")
+        if hasattr(st, 'secrets'):
+            st.error("Google Sheets connection not available. Cannot restore all data.")
+        return False, "Google Sheets connection not available."
+
+# Test block (for local execution, won't use Streamlit secrets)
+if __name__ == "__main__":
+    print("Running Google Sheets Sync Test (local mode, adapted for template)...")
+    # Ensure data directory exists for local testing
+    if not os.path.exists(DATA_DIR):
+        os.makedirs(DATA_DIR)
+        print(f"Created data directory: {DATA_DIR}")
+        # Optionally create dummy YAML files if needed for testing
+        # with open(os.path.join(DATA_DIR, 'marketing_activities.yaml'), 'w') as f: yaml.dump({'marketing_activities': []}, f)
+        # with open(os.path.join(DATA_DIR, 'config.yaml'), 'w') as f: yaml.dump({'Key': 'app_name', 'Value': 'Test App'}, f)
+
+    sync = GoogleSheetsSync()
+    if sync.client and sync.spreadsheet:
+        print("Connection successful!")
+        # Test getting current month tab name
+        print(f"Current month tab name: {sync.get_current_month_tab_name()}")
+
+        # Test syncing one table (e.g., activities)
+        print("\nTesting sync_data for marketing_activities...")
+        # Ensure you have some data in data/marketing_activities.yaml for testing
+        sync_success, sync_msg = sync.sync_data("marketing_activities")
+        print(f"Sync result for marketing_activities: {sync_success} - {sync_msg}")
+
+        # Test restoring one table
+        # print("\nTesting restore_data for marketing_activities...")
+        # restore_success, restore_msg = sync.restore_data("marketing_activities")
+        # print(f"Restore result for marketing_activities: {restore_success} - {restore_msg}")
+    else:
+        print("Connection failed! Check local credentials file and API access.")
 
