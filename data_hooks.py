@@ -184,14 +184,10 @@ def get_available_tabs():
     try:
         sync = get_sync_instance()
 
-        if not sync or not sync.connect(): 
-
-        if not sync or not sync.connect(): # Check if sync object exists before calling connect
-
+        if not sync or not sync.connect():
             return False, "Failed to connect to Google Sheets.", []
         worksheets = sync.spreadsheet.worksheets()
         tab_names = [ws.title for ws in worksheets]
         return True, "Successfully retrieved tab names.", tab_names
     except Exception as e:
         return False, f"Error getting tab names: {e}", []
-
