@@ -1096,29 +1096,29 @@ def main():
     # Tampilkan sidebar dan dapatkan menu yang dipilih
     menu = show_sidebar()
     
-     # Tampilkan halaman sesuai menu yang dipilih
-        if menu == "Dashboard":
+    # Tampilkan halaman sesuai menu yang dipilih
+    if menu == "Dashboard":
             if st.session_state.user['role'] == 'superadmin':
                 show_superadmin_dashboard()
             else:
                 show_marketing_dashboard()
-        elif menu == "Aktivitas Pemasaran":
+    elif menu == "Aktivitas Pemasaran":
             show_marketing_activities_page()
-        elif menu == "Follow-up":
+    elif menu == "Follow-up":
             show_followup_page()
-        elif menu == "Manajemen Pengguna":
+    elif menu == "Manajemen Pengguna":
             if st.session_state.user['role'] == 'superadmin':
                 show_user_management_page()
             else:
                 st.error("Anda tidak memiliki akses ke halaman ini.")
-        elif menu == "Pengaturan":
+    elif menu == "Pengaturan":
             if st.session_state.user['role'] == 'superadmin':
                 show_settings_page()
             else:
                 st.error("Anda tidak memiliki akses ke halaman ini.")
-        elif menu == "Profil":
+    elif menu == "Profil":
             show_profile_page()   
-        elif menu == "Pengaturan Google Sheets":
+    elif menu == "Pengaturan Google Sheets":
         # Use the settings page that includes Google Sheets integration
         # Assuming app_with_sheets.py defines show_settings_page_with_sheets
         try:
