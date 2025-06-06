@@ -177,13 +177,10 @@ def main_with_sheets():
     
     # Cek login
     if not st.session_state.logged_in:
-        user = authenticate_user()
-        if user:
-            st.session_state.logged_in = True
-            st.session_state.user = user
-        else:
-            show_login_page()
-            return
+        # If not logged in, display the login page.
+        # The show_login_page function handles authentication and session state update.
+        show_login_page()
+        return # Stop execution here until login is successful and page reruns
     
     # Tampilkan sidebar dan dapatkan menu yang dipilih
     menu = show_sidebar()
