@@ -131,6 +131,15 @@ def show_login_page():
                     st.rerun()
                 else:
                     st.error("Username atau password salah!")
+                if user:
+                    st.session_state.logged_in = True
+                    st.session_state.user = user
+                    if 'password_hash' in st.session_state.user:
+                        del st.session_state.user['password_hash']
+                    st.success("Login berhasil!")
+                    st.rerun()
+                else:
+                    st.error("Username atau password salah!")
         
         # Footer
         st.markdown("""
@@ -1054,6 +1063,12 @@ def show_profile_page():
                 #     st.error(message)
                 st.warning("Fitur ubah password belum diimplementasikan.") # Placeholder
 
+def logout():
+    """Clear session state to log the user out."""
+    st.session_state.logged_in = False
+    st.session_state.user = None
+    st.info("Anda telah berhasil logout.") # Memberi feedback ke user
+
 # Main application logic
 def main():
     # Inisialisasi session state
@@ -1070,8 +1085,8 @@ def main():
             st.session_state.logged_in = True
             st.session_state.user = user
         else:
-            show_login_page()
-            return
+            menu = show_sidebar()
+            
     
     # Tampilkan sidebar dan dapatkan menu yang dipilih
     menu = show_sidebar()
@@ -1083,12 +1098,21 @@ def main():
         else:
             show_marketing_dashboard()
     elif menu == "Aktivitas Pemasaran":
-        show_marketing_activities_page()
+            show_marketing_activities_page()
     elif menu == "Follow-up":
-        show_followup_page()
+            show_followup_page()
     elif menu == "Manajemen Pengguna":
-        show_user_management_page()
+            show_user_management_page()
+        if st.session_state.user['role'] == 'superadmin':
+            show_user_management_page()
+        else:
+            st.error("Anda tidak memiliki akses ke halaman ini.")
     elif menu == "Pengaturan":
+        if st.session_state.user['role'] == 'superadmin':
+            show_settings_page()
+        else:
+            st.error("Anda tidak memiliki akses ke halaman ini.")
+    elif menu == "Pengaturan Google Sheets":
         # Use the settings page that includes Google Sheets integration
         # Assuming app_with_sheets.py defines show_settings_page_with_sheets
         try:
