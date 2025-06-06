@@ -130,8 +130,8 @@ def add_google_sheets_sync_ui():
                                     internal_table_name = key
                                     break
                             
-                            if internal_table_name:
                                 if internal_table_name:
+                        # Call the restore function
                                     with st.spinner(f"Memulihkan data dari sheet '{selected_sheet_name}'..."):
                                         try:
                                             from data_hooks import manual_restore_one
@@ -150,36 +150,7 @@ def add_google_sheets_sync_ui():
         elif not success:
             st.error(f"Tidak dapat mengambil daftar tab dari Google Sheets: {message}")
         else:
-             st.info("Tidak ada sheet yang ditemukan di Google Sheet Anda.")
-                                # Call restore for the specific table
-                                # Assuming data_hooks has a function like manual_restore_one(table_name)
-                                # If not, need to adapt or call google_sheets_sync directly
-                                        try:
-                                            from data_hooks import manual_restore_one
-                                            success, message = manual_restore_one(internal_table_name)
-                                        except ImportError:
-                                     # Fallback or error if specific restore hook isn't available
-                                                st.error("Fungsi restore spesifik tidak ditemukan. Menggunakan restore semua (jika tersedia).")
-                                     # Or call sync instance directly (less ideal)
-                                     # from google_sheets_sync import get_sync_instance
-                                     # sync = get_sync_instance()
-                                     # success, message = sync.restore_data(internal_table_name)
-                                            success, message = False, "Fungsi restore spesifik tidak ada."
-                                     
-                                if success:
-                                    st.success(message + " Silakan refresh halaman.")
-                                    st.rerun()
-                                else:
-                                    st.error(message)
-                            else:
-                                st.error(f"Nama tabel internal tidak ditemukan untuk sheet 	{selected_tab}	.")
-            else:
-                 st.info("Tidak ada sheet data utama (Activities, Followups, Users, Config) yang ditemukan untuk di-restore.")
-
-        elif not success:
-            st.error(f"Tidak dapat mengambil daftar tab dari Google Sheets: {message}")
-        else: # Success but no tabs
-             st.info("Tidak ada sheet yang ditemukan di Google Sheet.")
+            st.info("Tidak ada sheet yang ditemukan di Google Sheet.")
     
     st.divider()
     
