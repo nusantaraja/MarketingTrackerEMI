@@ -96,12 +96,12 @@ def get_wib_now_str(): # Renamed for clarity
     """Returns the current time in WIB as a formatted string."""
     now_wib = datetime.now(WIB_TZ)
     return now_wib.strftime("%Y-%m-%d %H:%M:%S")
-=======
+
 def get_current_timestamp():
     # Get current time in WIB
     now_wib = datetime.now(WIB_TZ)
     return now_wib.strftime("%Y-%m-%d %H:%M:%S") # Format as string
->>>>>>> c322489fbe8fc5503ed4811a8ba1299a9d913c72
+
 
 # --- Database Initialization --- 
 
