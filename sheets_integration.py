@@ -163,4 +163,3 @@ def add_google_sheets_sync_ui():
             st.error("Tidak dapat terhubung ke Google Sheets.")
     except Exception as e:
         st.error(f"Error saat memeriksa koneksi: {e}")
-

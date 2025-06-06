@@ -127,7 +127,6 @@ def manual_sync_all(incremental=False):
         incremental (bool): If True, perform incremental sync for relevant tables.
     """
     try:
-
         sync_instance = get_sync_instance()
         if not sync_instance:
              return False, "Failed to get Google Sheets sync instance."
@@ -136,19 +135,9 @@ def manual_sync_all(incremental=False):
     except Exception as e:
         return False, f"Error during manual sync: {e}"
 
-        # FIXED: Handle tuple return (success, message) instead of dict
-        success, message = sync_all()
-        # Return the success status and the message from sync_all
-        return success, message 
-    except Exception as e:
-        # Return False and the error message if an exception occurs
-        return False, f"Error syncing to Google Sheets: {e}"
-
-
 def manual_restore_one(table_name):
     """Manually trigger restore of a specific table from Google Sheets."""
     try:
-        # Get the sync instance
         sync_instance = get_sync_instance()
         if not sync_instance:
              return False, "Failed to get Google Sheets sync instance."
@@ -170,21 +159,11 @@ def manual_restore_all(tab_name=None):
     except Exception as e:
         return False, f"Error restoring all data: {e}"
 
-        # FIXED: Handle tuple return (success, message) instead of dict
-        success, message = restore_all(tab_name)
-        # Return the success status and the message from restore_all
-        return success, message
-    except Exception as e:
-        # Return False and the error message if an exception occurs
-        return False, f"Error restoring from Google Sheets: {e}"
-
-
 def get_available_tabs():
     """Get a list of available tabs in the Google Sheet."""
     try:
         sync = get_sync_instance()
-
-        if not sync or not sync.connect():
+        if not sync or not sync.connect(): 
             return False, "Failed to connect to Google Sheets.", []
         worksheets = sync.spreadsheet.worksheets()
         tab_names = [ws.title for ws in worksheets]
