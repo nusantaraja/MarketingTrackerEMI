@@ -1076,12 +1076,35 @@ def main():
     if 'user' not in st.session_state:
         st.session_state.user = None
 
-    # Logika utama: jika tidak login, tampilkan halaman login. Jika sudah, tampilkan aplikasi utama.
+    # Logika utama yang sangat sederhana dan anti-error
     if not st.session_state.logged_in:
+        # Jika belum login, hanya tampilkan halaman login. Titik.
         show_login_page()
     else:
-        # Tampilkan sidebar dan dapatkan menu yang dipilih
+        # Jika sudah login, tampilkan sidebar dan routing menu
         menu = show_sidebar()
+        
+        if menu == "Dashboard":
+            if st.session_state.user['role'] == 'superadmin':
+                show_superadmin_dashboard()
+            else:
+                show_marketing_dashboard()
+        elif menu == "Aktivitas Pemasaran":
+            show_marketing_activities_page()
+        elif menu == "Follow-up":
+            show_followup_page()
+        elif menu == "Manajemen Pengguna":
+            if st.session_state.user['role'] == 'superadmin':
+                show_user_management_page()
+            else:
+                st.error("Anda tidak memiliki akses ke halaman ini.")
+        elif menu == "Pengaturan":
+            if st.session_state.user['role'] == 'superadmin':
+                show_settings_page()
+            else:
+                st.error("Anda tidak memiliki akses ke halaman ini.")
+        elif menu == "Profil":
+            show_profile_page()
     
     # Cek login
     if not st.session_state.logged_in:
