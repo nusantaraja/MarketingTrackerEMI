@@ -177,7 +177,7 @@ def main_with_sheets():
     
     # Cek login
     if not st.session_state.logged_in:
-        user = check_login()
+        user = authenticate_user()
         if user:
             st.session_state.logged_in = True
             st.session_state.user = user
