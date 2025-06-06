@@ -50,7 +50,7 @@ def write_yaml(file_path, data):
             yaml.dump(data, file, default_flow_style=False, sort_keys=False, allow_unicode=True)
     except Exception as e:
         print(f"Error writing YAML file {file_path}: {e}")
-<<<<<<< HEAD
+# --- Database Initialization ---
         if hasattr(st, "error"): # Check if streamlit context exists
              st.error(f"Gagal menyimpan data ke {os.path.basename(file_path)}.")
 
@@ -91,7 +91,7 @@ def verify_password(password, hashed_password):
 def generate_id(prefix):
     return f"{prefix}-{uuid.uuid4().hex[:8]}"
 
-<<<<<<< HEAD
+
 def get_wib_now_str(): # Renamed for clarity
     """Returns the current time in WIB as a formatted string."""
     now_wib = datetime.now(WIB_TZ)
@@ -118,7 +118,7 @@ def initialize_database():
                 "name": "Admin Utama",
                 "role": "superadmin",
                 "email": "admin@example.com",
-<<<<<<< HEAD
+
                 "created_at": get_wib_now_str() # Use WIB timestamp
 =======
                 "created_at": get_current_timestamp() # Use WIB timestamp
@@ -202,7 +202,6 @@ def add_user(username, password, name, role, email):
         "name": name,
         "role": role,
         "email": email,
-<<<<<<< HEAD
         "created_at": get_wib_now_str() # Use WIB timestamp
 =======
         "created_at": get_current_timestamp() # Use WIB timestamp
@@ -252,7 +251,7 @@ def add_marketing_activity(marketer_username, prospect_name, prospect_location,
     if not activities_data or "marketing_activities" not in activities_data:
         activities_data = {"marketing_activities": []}
     activity_id = generate_id("act")
-<<<<<<< HEAD
+
     current_time_wib = get_wib_now_str() # Get WIB timestamp
 =======
     current_time_wib = get_current_timestamp() # Get WIB timestamp
@@ -300,7 +299,7 @@ def edit_marketing_activity(activity_id, prospect_name, prospect_location,
                 "activity_type": activity_type,
                 "description": description,
                 "status": status,
-<<<<<<< HEAD
+
                 "updated_at": get_wib_now_str() # Use WIB timestamp for update
 =======
                 "updated_at": get_current_timestamp() # Use WIB timestamp for update
@@ -341,7 +340,7 @@ def update_activity_status(activity_id, new_status):
     for activity in activities_data["marketing_activities"]:
         if activity["id"] == activity_id:
             activity["status"] = new_status
-<<<<<<< HEAD
+
             activity["updated_at"] = get_wib_now_str() # Use WIB timestamp for update
 =======
             activity["updated_at"] = get_current_timestamp() # Use WIB timestamp for update
@@ -394,7 +393,7 @@ def add_followup(activity_id, marketer_username, followup_date, notes,
         "next_followup_date": str(next_followup_date) if next_followup_date else None, # Ensure date is string or None
         "interest_level": interest_level,
         "status_update": status_update,
-<<<<<<< HEAD
+
         "created_at": get_wib_now_str() # Use WIB timestamp
 =======
         "created_at": get_current_timestamp() # Use WIB timestamp
@@ -431,7 +430,7 @@ def update_app_config(new_config_subset):
     current_config = get_app_config() # Get current or default config
     current_config.update(new_config_subset) # Update with new values
     write_yaml(config_file, current_config)
-<<<<<<< HEAD
+
     return True, "Konfigurasi aplikasi berhasil diperbarui"
 
 =======
