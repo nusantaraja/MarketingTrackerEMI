@@ -291,14 +291,9 @@ def edit_marketing_activity(activity_id, prospect_name, prospect_location,
                 "activity_type": activity_type,
                 "description": description,
                 "status": status,
-
-                "updated_at": get_wib_now_str() # Use WIB timestamp for update
-
                 "updated_at": get_current_timestamp() # Use WIB timestamp for update
-
             })
-            break
-    if not activity_found:
+            break    if not activity_found:
         return False, "Aktivitas tidak ditemukan"
     write_yaml(activities_file, activities_data)
     return True, "Aktivitas pemasaran berhasil diperbarui"
