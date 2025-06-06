@@ -1068,7 +1068,6 @@ def logout():
     st.session_state.user = None
     st.info("Anda telah berhasil logout.") # Memberi feedback ke user
 
-# Main application logic
 def main():
     # Inisialisasi session state jika belum ada
     if 'logged_in' not in st.session_state:
@@ -1092,33 +1091,32 @@ def main():
         else:
             menu = show_sidebar()
             
-    
     # Tampilkan sidebar dan dapatkan menu yang dipilih
     menu = show_sidebar()
     
-     # Tampilkan halaman sesuai menu yang dipilih
-        if menu == "Dashboard":
-            if st.session_state.user['role'] == 'superadmin':
-                show_superadmin_dashboard()
-            else:
-                show_marketing_dashboard()
-        elif menu == "Aktivitas Pemasaran":
-            show_marketing_activities_page()
-        elif menu == "Follow-up":
-            show_followup_page()
-        elif menu == "Manajemen Pengguna":
-            if st.session_state.user['role'] == 'superadmin':
-                show_user_management_page()
-            else:
-                st.error("Anda tidak memiliki akses ke halaman ini.")
-        elif menu == "Pengaturan":
-            if st.session_state.user['role'] == 'superadmin':
-                show_settings_page()
-            else:
-                st.error("Anda tidak memiliki akses ke halaman ini.")
-        elif menu == "Profil":
-            show_profile_page()   
-        elif menu == "Pengaturan Google Sheets":
+    # Tampilkan halaman sesuai menu yang dipilih
+    if menu == "Dashboard":
+        if st.session_state.user['role'] == 'superadmin':
+            show_superadmin_dashboard()
+        else:
+            show_marketing_dashboard()
+    elif menu == "Aktivitas Pemasaran":
+        show_marketing_activities_page()
+    elif menu == "Follow-up":
+        show_followup_page()
+    elif menu == "Manajemen Pengguna":
+        if st.session_state.user['role'] == 'superadmin':
+            show_user_management_page()
+        else:
+            st.error("Anda tidak memiliki akses ke halaman ini.")
+    elif menu == "Pengaturan":
+        if st.session_state.user['role'] == 'superadmin':
+            show_settings_page()
+        else:
+            st.error("Anda tidak memiliki akses ke halaman ini.")
+    elif menu == "Profil":
+        show_profile_page()   
+    elif menu == "Pengaturan Google Sheets":
         # Use the settings page that includes Google Sheets integration
         # Assuming app_with_sheets.py defines show_settings_page_with_sheets
         try:
@@ -1126,9 +1124,7 @@ def main():
             show_settings_page_with_sheets()
         except ImportError:
             st.error("Komponen pengaturan Google Sheets tidak ditemukan. Menggunakan pengaturan dasar.")
-            show_settings_page() # Fallback to basic settings page
-    elif menu == "Profil":
-        show_profile_page()
+            show_settings_page() # Fallback to basic settings page        show_profile_page()
 
 if __name__ == "__main__":
     main()
