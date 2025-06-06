@@ -71,7 +71,18 @@ def write_yaml_data(table_name, data):
     write_yaml(file_path, data)
 def read_yaml_data(table_name):
         st.error(f"Gagal menyimpan data ke {os.path.basename(file_path)}.")
->>>>>>> c322489fbe8fc5503ed4811a8ba1299a9d913c72
+    filename_map = {
+        "marketing_activities": ACTIVITIES_FILENAME,
+        "users": USERS_FILENAME,
+        "followups": FOLLOWUPS_FILENAME,
+        "config": CONFIG_FILENAME
+    }
+    filename = filename_map.get(table_name)
+    if not filename:
+        print(f"Error: Unknown table name 	{table_name}	 for reading YAML data.")
+        return None
+    file_path = os.path.join(DATA_DIR, filename)
+    return read_yaml(file_path)
 
 # --- Security --- 
 
