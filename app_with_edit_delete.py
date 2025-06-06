@@ -126,7 +126,10 @@ def show_login_page():
             submit = st.form_submit_button("Login", use_container_width=True)
             
             if submit:
-                if authenticate_user(username, password):
+                user = authenticate_user(username, password)
+                if user:
+                    st.session_state.logged_in = True
+                    st.session_state.user = user
                     st.success("Login berhasil!")
                     st.rerun()
                 else:
