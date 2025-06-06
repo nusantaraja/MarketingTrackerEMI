@@ -121,10 +121,7 @@ def initialize_database():
                 "created_at": get_wib_now_str() # Use WIB timestamp
             }
         ]
-    }
-            }
-        ]
-    }
+    }    
     create_yaml_if_not_exists(users_file, default_users)
     
     # File marketing_activities.yaml
