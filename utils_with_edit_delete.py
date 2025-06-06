@@ -293,11 +293,11 @@ def edit_marketing_activity(activity_id, prospect_name, prospect_location,
                 "status": status,
                 "updated_at": get_current_timestamp() # Use WIB timestamp for update
             })
-            break    if not activity_found:
+            break
+    if not activity_found:
         return False, "Aktivitas tidak ditemukan"
     write_yaml(activities_file, activities_data)
     return True, "Aktivitas pemasaran berhasil diperbarui"
-
 def delete_marketing_activity(activity_id):
     activities_file = os.path.join(DATA_DIR, ACTIVITIES_FILENAME)
     _migrate_activities_key(activities_file) # Ensure migration check
