@@ -69,7 +69,7 @@ def write_yaml_data(table_name, data):
         return
     file_path = os.path.join(DATA_DIR, filename)
     write_yaml(file_path, data)
-=======
+def read_yaml_data(table_name):
         st.error(f"Gagal menyimpan data ke {os.path.basename(file_path)}.")
 >>>>>>> c322489fbe8fc5503ed4811a8ba1299a9d913c72
 
