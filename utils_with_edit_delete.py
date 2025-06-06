@@ -120,9 +120,9 @@ def initialize_database():
                 "email": "admin@example.com",
 
                 "created_at": get_wib_now_str() # Use WIB timestamp
-=======
+
                 "created_at": get_current_timestamp() # Use WIB timestamp
->>>>>>> c322489fbe8fc5503ed4811a8ba1299a9d913c72
+
             }
         ]
     }
@@ -203,9 +203,9 @@ def add_user(username, password, name, role, email):
         "role": role,
         "email": email,
         "created_at": get_wib_now_str() # Use WIB timestamp
-=======
+
         "created_at": get_current_timestamp() # Use WIB timestamp
->>>>>>> c322489fbe8fc5503ed4811a8ba1299a9d913c72
+
     }
     users_data["users"].append(new_user)
     write_yaml(users_file, users_data)
@@ -253,9 +253,9 @@ def add_marketing_activity(marketer_username, prospect_name, prospect_location,
     activity_id = generate_id("act")
 
     current_time_wib = get_wib_now_str() # Get WIB timestamp
-=======
+
     current_time_wib = get_current_timestamp() # Get WIB timestamp
->>>>>>> c322489fbe8fc5503ed4811a8ba1299a9d913c72
+
     new_activity = {
         "id": activity_id,
         "marketer_username": marketer_username,
@@ -301,9 +301,9 @@ def edit_marketing_activity(activity_id, prospect_name, prospect_location,
                 "status": status,
 
                 "updated_at": get_wib_now_str() # Use WIB timestamp for update
-=======
+
                 "updated_at": get_current_timestamp() # Use WIB timestamp for update
->>>>>>> c322489fbe8fc5503ed4811a8ba1299a9d913c72
+
             })
             break
     if not activity_found:
@@ -342,9 +342,9 @@ def update_activity_status(activity_id, new_status):
             activity["status"] = new_status
 
             activity["updated_at"] = get_wib_now_str() # Use WIB timestamp for update
-=======
+
             activity["updated_at"] = get_current_timestamp() # Use WIB timestamp for update
->>>>>>> c322489fbe8fc5503ed4811a8ba1299a9d913c72
+
             activity_found = True
             break
     if not activity_found:
@@ -395,9 +395,9 @@ def add_followup(activity_id, marketer_username, followup_date, notes,
         "status_update": status_update,
 
         "created_at": get_wib_now_str() # Use WIB timestamp
-=======
+
         "created_at": get_current_timestamp() # Use WIB timestamp
->>>>>>> c322489fbe8fc5503ed4811a8ba1299a9d913c72
+
     }
     followups_data["followups"].append(new_followup)
     write_yaml(followups_file, followups_data)
@@ -433,7 +433,7 @@ def update_app_config(new_config_subset):
 
     return True, "Konfigurasi aplikasi berhasil diperbarui"
 
-=======
+
     return True, "Konfigurasi berhasil diperbarui"
 
 # --- Session Management (Simplified) ---
@@ -455,4 +455,4 @@ def check_login():
         return st.session_state.user
     return None
 
->>>>>>> c322489fbe8fc5503ed4811a8ba1299a9d913c72
+
