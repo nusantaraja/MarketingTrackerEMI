@@ -200,11 +200,9 @@ def add_user(username, password, name, role, email):
         "email": email,
         "created_at": get_current_timestamp() # Use WIB timestamp
     }
-    }
     users_data["users"].append(new_user)
     write_yaml(users_file, users_data)
     return True, "Pengguna berhasil ditambahkan"
-
 def delete_user(username, current_user_username):
     if username == current_user_username:
         return False, "Anda tidak dapat menghapus akun Anda sendiri"
