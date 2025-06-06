@@ -380,11 +380,7 @@ def add_followup(activity_id, marketer_username, followup_date, notes,
         "next_followup_date": str(next_followup_date) if next_followup_date else None, # Ensure date is string or None
         "interest_level": interest_level,
         "status_update": status_update,
-
         "created_at": get_wib_now_str() # Use WIB timestamp
-
-        "created_at": get_current_timestamp() # Use WIB timestamp
-
     }
     followups_data["followups"].append(new_followup)
     write_yaml(followups_file, followups_data)
