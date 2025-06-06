@@ -198,10 +198,8 @@ def add_user(username, password, name, role, email):
         "name": name,
         "role": role,
         "email": email,
-        "created_at": get_wib_now_str() # Use WIB timestamp
-
         "created_at": get_current_timestamp() # Use WIB timestamp
-
+    }
     }
     users_data["users"].append(new_user)
     write_yaml(users_file, users_data)
