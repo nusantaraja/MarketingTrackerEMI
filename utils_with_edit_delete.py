@@ -50,6 +50,7 @@ def write_yaml(file_path, data):
             yaml.dump(data, file, default_flow_style=False, sort_keys=False, allow_unicode=True)
     except Exception as e:
         print(f"Error writing YAML file {file_path}: {e}")
+<<<<<<< HEAD
         if hasattr(st, "error"): # Check if streamlit context exists
              st.error(f"Gagal menyimpan data ke {os.path.basename(file_path)}.")
 
@@ -68,6 +69,9 @@ def write_yaml_data(table_name, data):
         return
     file_path = os.path.join(DATA_DIR, filename)
     write_yaml(file_path, data)
+=======
+        st.error(f"Gagal menyimpan data ke {os.path.basename(file_path)}.")
+>>>>>>> c322489fbe8fc5503ed4811a8ba1299a9d913c72
 
 # --- Security --- 
 
@@ -87,10 +91,17 @@ def verify_password(password, hashed_password):
 def generate_id(prefix):
     return f"{prefix}-{uuid.uuid4().hex[:8]}"
 
+<<<<<<< HEAD
 def get_wib_now_str(): # Renamed for clarity
     """Returns the current time in WIB as a formatted string."""
     now_wib = datetime.now(WIB_TZ)
     return now_wib.strftime("%Y-%m-%d %H:%M:%S")
+=======
+def get_current_timestamp():
+    # Get current time in WIB
+    now_wib = datetime.now(WIB_TZ)
+    return now_wib.strftime("%Y-%m-%d %H:%M:%S") # Format as string
+>>>>>>> c322489fbe8fc5503ed4811a8ba1299a9d913c72
 
 # --- Database Initialization --- 
 
@@ -107,7 +118,11 @@ def initialize_database():
                 "name": "Admin Utama",
                 "role": "superadmin",
                 "email": "admin@example.com",
+<<<<<<< HEAD
                 "created_at": get_wib_now_str() # Use WIB timestamp
+=======
+                "created_at": get_current_timestamp() # Use WIB timestamp
+>>>>>>> c322489fbe8fc5503ed4811a8ba1299a9d913c72
             }
         ]
     }
@@ -187,7 +202,11 @@ def add_user(username, password, name, role, email):
         "name": name,
         "role": role,
         "email": email,
+<<<<<<< HEAD
         "created_at": get_wib_now_str() # Use WIB timestamp
+=======
+        "created_at": get_current_timestamp() # Use WIB timestamp
+>>>>>>> c322489fbe8fc5503ed4811a8ba1299a9d913c72
     }
     users_data["users"].append(new_user)
     write_yaml(users_file, users_data)
@@ -233,7 +252,11 @@ def add_marketing_activity(marketer_username, prospect_name, prospect_location,
     if not activities_data or "marketing_activities" not in activities_data:
         activities_data = {"marketing_activities": []}
     activity_id = generate_id("act")
+<<<<<<< HEAD
     current_time_wib = get_wib_now_str() # Get WIB timestamp
+=======
+    current_time_wib = get_current_timestamp() # Get WIB timestamp
+>>>>>>> c322489fbe8fc5503ed4811a8ba1299a9d913c72
     new_activity = {
         "id": activity_id,
         "marketer_username": marketer_username,
@@ -277,7 +300,11 @@ def edit_marketing_activity(activity_id, prospect_name, prospect_location,
                 "activity_type": activity_type,
                 "description": description,
                 "status": status,
+<<<<<<< HEAD
                 "updated_at": get_wib_now_str() # Use WIB timestamp for update
+=======
+                "updated_at": get_current_timestamp() # Use WIB timestamp for update
+>>>>>>> c322489fbe8fc5503ed4811a8ba1299a9d913c72
             })
             break
     if not activity_found:
@@ -314,7 +341,11 @@ def update_activity_status(activity_id, new_status):
     for activity in activities_data["marketing_activities"]:
         if activity["id"] == activity_id:
             activity["status"] = new_status
+<<<<<<< HEAD
             activity["updated_at"] = get_wib_now_str() # Use WIB timestamp for update
+=======
+            activity["updated_at"] = get_current_timestamp() # Use WIB timestamp for update
+>>>>>>> c322489fbe8fc5503ed4811a8ba1299a9d913c72
             activity_found = True
             break
     if not activity_found:
@@ -363,7 +394,11 @@ def add_followup(activity_id, marketer_username, followup_date, notes,
         "next_followup_date": str(next_followup_date) if next_followup_date else None, # Ensure date is string or None
         "interest_level": interest_level,
         "status_update": status_update,
+<<<<<<< HEAD
         "created_at": get_wib_now_str() # Use WIB timestamp
+=======
+        "created_at": get_current_timestamp() # Use WIB timestamp
+>>>>>>> c322489fbe8fc5503ed4811a8ba1299a9d913c72
     }
     followups_data["followups"].append(new_followup)
     write_yaml(followups_file, followups_data)
@@ -396,5 +431,29 @@ def update_app_config(new_config_subset):
     current_config = get_app_config() # Get current or default config
     current_config.update(new_config_subset) # Update with new values
     write_yaml(config_file, current_config)
+<<<<<<< HEAD
     return True, "Konfigurasi aplikasi berhasil diperbarui"
 
+=======
+    return True, "Konfigurasi berhasil diperbarui"
+
+# --- Session Management (Simplified) ---
+
+def login(username, password):
+    user = authenticate_user(username, password)
+    if user:
+        st.session_state.logged_in = True
+        st.session_state.user = user
+        return True
+    return False
+
+def logout():
+    st.session_state.logged_in = False
+    st.session_state.user = None
+
+def check_login():
+    if st.session_state.get("logged_in", False):
+        return st.session_state.user
+    return None
+
+>>>>>>> c322489fbe8fc5503ed4811a8ba1299a9d913c72
