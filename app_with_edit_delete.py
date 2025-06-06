@@ -1100,9 +1100,10 @@ def main():
     elif menu == "Aktivitas Pemasaran":
             show_marketing_activities_page()
     elif menu == "Follow-up":
-            show_followup_page()
+
+        show_followup_page()
     elif menu == "Manajemen Pengguna":
-            show_user_management_page()
+
         if st.session_state.user['role'] == 'superadmin':
             show_user_management_page()
         else:
@@ -1111,7 +1112,7 @@ def main():
         if st.session_state.user['role'] == 'superadmin':
             show_settings_page()
         else:
-            st.error("Anda tidak memiliki akses ke halaman ini.")
+            st.error("Anda tidak memiliki akses ke halaman ini.")    
     elif menu == "Pengaturan Google Sheets":
         # Use the settings page that includes Google Sheets integration
         # Assuming app_with_sheets.py defines show_settings_page_with_sheets
