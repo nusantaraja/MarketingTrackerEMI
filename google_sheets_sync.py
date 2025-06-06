@@ -5,10 +5,8 @@ This module handles synchronization between the local application data and Googl
 assuming dedicated sheets (
     'Activities', 'Followups', 'Users', 'Config') exist
 as per the provided template.
-<<<<<<< HEAD
+
 Includes incremental sync logic to avoid duplicates.
-=======
->>>>>>> c322489fbe8fc5503ed4811a8ba1299a9d913c72
 """
 
 import os
@@ -20,10 +18,8 @@ import pytz # Import pytz
 import streamlit as st
 import uuid  # For generating user IDs if missing
 import re # For cleaning phone numbers
-<<<<<<< HEAD
+# Import the main sync instance getter
 from utils_with_edit_delete import get_app_config, update_app_config # For last sync time
-=======
->>>>>>> c322489fbe8fc5503ed4811a8ba1299a9d913c72
 
 # Constants
 # Use the user-provided ID
@@ -31,10 +27,9 @@ SPREADSHEET_ID = "1IRZ6iLmE62lPyiv8sJqLMQBH66fci7L-H9NuGiscMvo"
 CREDENTIALS_FILE = "service_account_key.json"
 DATA_DIR = "data"
 WIB_TZ = pytz.timezone("Asia/Bangkok") # Define WIB timezone (UTC+7)
-<<<<<<< HEAD
+# Constants for synchronization
 LAST_MANUAL_SYNC_KEY = "last_manual_sync_timestamp_wib"
-=======
->>>>>>> c322489fbe8fc5503ed4811a8ba1299a9d913c72
+# --- Helper functions for synchronization ---
 
 # Map internal table names to actual Google Sheet names
 # Ensure these sheet names exactly match the tabs in your Google Sheet
@@ -77,7 +72,7 @@ TIMESTAMP_COLUMNS = {
     "followups": ['created_at'],
     "users": ['created_at']
 }
-<<<<<<< HEAD
+# --- Helper functions for synchronization ---
 
 # --- Helper to get last sync time --- 
 def get_last_manual_sync_time():
@@ -89,8 +84,7 @@ def set_last_manual_sync_time():
     timestamp_str = datetime.now(WIB_TZ).strftime("%Y-%m-%d %H:%M:%S")
     update_app_config({LAST_MANUAL_SYNC_KEY: timestamp_str})
     print(f"Updated last manual sync time to: {timestamp_str}")
-=======
->>>>>>> c322489fbe8fc5503ed4811a8ba1299a9d913c72
+# --- Helper to get user ID ---
 
 class GoogleSheetsSync:
     def __init__(self, credentials_file=CREDENTIALS_FILE, spreadsheet_id=SPREADSHEET_ID):
@@ -108,11 +102,11 @@ class GoogleSheetsSync:
             try:
                 # Simple check: list worksheets
                 self.spreadsheet.worksheets()
-<<<<<<< HEAD
+
                 # print("Existing connection seems valid.") # Reduce noise
-=======
+
                 print("Existing connection seems valid.")
->>>>>>> c322489fbe8fc5503ed4811a8ba1299a9d913c72
+    
                 return True
             except Exception as conn_err:
                 print(f"Existing connection check failed: {conn_err}. Reconnecting...")
@@ -202,13 +196,13 @@ class GoogleSheetsSync:
                     st.warning(
                         f"The following required sheets are missing in your Google Sheet '{self.spreadsheet.title}': {', '.join(missing_sheets)}. Please ensure they exist and match the template."
                     )
-<<<<<<< HEAD
+
             # else:
                 # print("All required sheets found.") # Reduce noise
-=======
+
             else:
                 print("All required sheets found.")
->>>>>>> c322489fbe8fc5503ed4811a8ba1299a9d913c72
+
         except Exception as e:
             print(f"Error verifying sheets: {e}")
             if hasattr(st, 'secrets'):
@@ -244,11 +238,11 @@ class GoogleSheetsSync:
 
         try:
             worksheet = self.spreadsheet.worksheet(target_sheet_name)
-<<<<<<< HEAD
+
             # print(f"Accessed worksheet: '{target_sheet_name}'") # Reduce noise
-=======
+
             print(f"Accessed worksheet: '{target_sheet_name}'")
->>>>>>> c322489fbe8fc5503ed4811a8ba1299a9d913c72
+
             return worksheet
         except gspread.exceptions.WorksheetNotFound:
             print(
@@ -318,7 +312,7 @@ class GoogleSheetsSync:
         # Default: return as string (without quote unless specified above)
         return str(value)
 
-<<<<<<< HEAD
+
     def sync_data(self, table_name, incremental=False):
         """Sync data from a specific table's YAML file to its dedicated Google Sheet.
         
@@ -331,30 +325,30 @@ class GoogleSheetsSync:
         worksheet = self._get_target_sheet(table_name)
         if not worksheet:
             return False, f"Target sheet for {table_name} not found."
-=======
-    def sync_data(self, table_name):
+        
+        ync_data(self, table_name):
         """Sync data from a specific table's YAML file to its dedicated Google Sheet."""
         print(f"Starting sync for table: {table_name}")
         worksheet = self._get_target_sheet(table_name)
         if not worksheet:
             return False, f"Target sheet for {table_name} not found." # Return message
->>>>>>> c322489fbe8fc5503ed4811a8ba1299a9d913c72
+
 
         file_path = os.path.join(DATA_DIR, f"{table_name}.yaml")
         if not os.path.exists(file_path):
             print(
                 f"Data file not found: {file_path}, skipping sync for {table_name}."
             )
-<<<<<<< HEAD
+
             return False, f"Data file {file_path} not found."
 
         # Read data from YAML
-=======
+
             # Return True, message? Or False? Let's return False as data is missing.
             return False, f"Data file {file_path} not found."
 
         # Read data from YAML, handling the root key structure
->>>>>>> c322489fbe8fc5503ed4811a8ba1299a9d913c72
+
         data_to_sync = []
         config_data_dict = {}
         try:
@@ -371,25 +365,25 @@ class GoogleSheetsSync:
                     print(
                         f"Warning: Expected dict structure for config.yaml, found {type(raw_data)}."
                     )
-<<<<<<< HEAD
+
                     return False, "Invalid config.yaml format."
-=======
+
                     return False, "Invalid config.yaml format." # Return message
->>>>>>> c322489fbe8fc5503ed4811a8ba1299a9d913c72
+
             elif isinstance(raw_data, dict) and table_name in raw_data:
                 data_to_sync = raw_data[table_name]
                 if not isinstance(data_to_sync, list):
                     print(
                         f"Warning: Expected list under key '{table_name}' in {file_path}, found {type(data_to_sync)}."
                     )
-<<<<<<< HEAD
+
                     data_to_sync = []
             elif isinstance(raw_data, list):
-=======
+
                     data_to_sync = []  # Treat as empty if structure is wrong
             elif isinstance(raw_data, list):
                 # Allow direct list structure as fallback?
->>>>>>> c322489fbe8fc5503ed4811a8ba1299a9d913c72
+
                 print(
                     f"Warning: Reading direct list from {file_path}. Expected dict with key '{table_name}'."
                 )
@@ -398,51 +392,51 @@ class GoogleSheetsSync:
                 print(
                     f"Warning: Unexpected YAML structure in {file_path}. Cannot sync."
                 )
-<<<<<<< HEAD
+
                 return False, f"Unexpected YAML structure in {file_path}."
-=======
+
                 return False, f"Unexpected YAML structure in {file_path}." # Return message
->>>>>>> c322489fbe8fc5503ed4811a8ba1299a9d913c72
+
 
         except Exception as e:
             print(f"Error reading or parsing YAML file {file_path}: {e}")
             if hasattr(st, 'secrets'):
                 st.error(f"Error reading data file for {table_name}: {e}")
-<<<<<<< HEAD
+
             return False, f"Error reading YAML file {file_path}."
 
         # Get the expected headers
-=======
+
             return False, f"Error reading YAML file {file_path}." # Return message
 
         # Get the expected headers for this sheet
->>>>>>> c322489fbe8fc5503ed4811a8ba1299a9d913c72
+
         expected_headers = EXPECTED_HEADERS.get(table_name)
         if not expected_headers:
             print(f"Error: No expected headers defined for table '{table_name}'.")
             if hasattr(st, 'secrets'):
                 st.error(f"Configuration error: Headers missing for {table_name}."
                          )
-<<<<<<< HEAD
+
             return False, f"Headers missing for {table_name}."
-=======
+
             return False, f"Headers missing for {table_name}." # Return message
->>>>>>> c322489fbe8fc5503ed4811a8ba1299a9d913c72
+
 
         # --- Sync Logic --- 
         try:
             if table_name == 'config':
-<<<<<<< HEAD
+
                 # Config: Always overwrite
-=======
+
                 # Config: Overwrite sheet with key-value pairs
->>>>>>> c322489fbe8fc5503ed4811a8ba1299a9d913c72
+
                 print(
                     f"Syncing config data (overwrite) to sheet '{TABLE_MAP[table_name]}'."
                 )
                 values_to_update = [expected_headers]  # Start with header row
                 for key, value in config_data_dict.items():
-<<<<<<< HEAD
+
                     values_to_update.append([str(key), str(value)])
 
                 worksheet.clear()
@@ -470,7 +464,7 @@ class GoogleSheetsSync:
                 yaml_ids = set()
                 id_column_index = expected_headers.index('id') if 'id' in expected_headers else -1
 
-=======
+
                     # Ensure strings
                     values_to_update.append([str(key), str(value)])
 
@@ -518,7 +512,7 @@ class GoogleSheetsSync:
 
                 # Prepare data rows in the correct order
                 rows_to_append = []
->>>>>>> c322489fbe8fc5503ed4811a8ba1299a9d913c72
+
                 for item in data_to_sync:
                     if not isinstance(item, dict):
                         print(
@@ -526,7 +520,7 @@ class GoogleSheetsSync:
                         )
                         continue
 
-<<<<<<< HEAD
+
                     # Ensure ID exists (especially for users)
                     if id_column_index != -1 and 'id' not in item:
                         if table_name == 'users':
@@ -706,7 +700,7 @@ class GoogleSheetsSync:
                         if value.startswith("'"):
                             processed_record[key] = value[1:] # Remove leading quote
                         else:
-=======
+
                     # Special handling for 'users' ID generation if missing
                     if table_name == 'users' and 'id' not in item:
                         item['id'] = f"usr-{uuid.uuid4().hex[:8]}"
@@ -841,7 +835,7 @@ class GoogleSheetsSync:
                         if value.startswith("'"):
                             processed_record[key] = value[1:] # Remove leading quote
                         else:
->>>>>>> c322489fbe8fc5503ed4811a8ba1299a9d913c72
+
                             processed_record[key] = value
                     restored_list.append(processed_record)
                 final_restored_data = {table_name: restored_list}
@@ -860,7 +854,7 @@ class GoogleSheetsSync:
                 print(msg)
                 if hasattr(st, 'secrets'): st.error(f"Error writing restored data to local file {file_path}: {write_err}")
                 return False, msg
-<<<<<<< HEAD
+
 
         except gspread.exceptions.APIError as e:
             msg = f"Google Sheets API Error restoring {table_name}: {e}"
@@ -939,7 +933,7 @@ def get_sync_instance():
         # _sync_instance = GoogleSheetsSync()
     return _sync_instance
 
-=======
+
 
         except gspread.exceptions.APIError as e:
             msg = f"Google Sheets API Error restoring {table_name}: {e}"
@@ -1100,4 +1094,3 @@ if __name__ == "__main__":
     else:
         print("Connection failed! Check local credentials file and API access.")
 
->>>>>>> c322489fbe8fc5503ed4811a8ba1299a9d913c72
