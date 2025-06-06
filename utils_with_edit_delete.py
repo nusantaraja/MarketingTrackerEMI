@@ -118,11 +118,10 @@ def initialize_database():
                 "name": "Admin Utama",
                 "role": "superadmin",
                 "email": "admin@example.com",
-
                 "created_at": get_wib_now_str() # Use WIB timestamp
-
-                "created_at": get_current_timestamp() # Use WIB timestamp
-
+            }
+        ]
+    }
             }
         ]
     }
