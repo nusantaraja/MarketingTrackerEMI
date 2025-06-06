@@ -325,15 +325,30 @@ class GoogleSheetsSync:
         worksheet = self._get_target_sheet(table_name)
         if not worksheet:
             return False, f"Target sheet for {table_name} not found."
+        
+        ync_data(self, table_name):
+        """Sync data from a specific table's YAML file to its dedicated Google Sheet."""
+        print(f"Starting sync for table: {table_name}")
+        worksheet = self._get_target_sheet(table_name)
+        if not worksheet:
+            return False, f"Target sheet for {table_name} not found." # Return message
+
 
         file_path = os.path.join(DATA_DIR, f"{table_name}.yaml")
         if not os.path.exists(file_path):
             print(
                 f"Data file not found: {file_path}, skipping sync for {table_name}."
             )
+
+            return False, f"Data file {file_path} not found."
+
+        # Read data from YAML
+
+            # Return True, message? Or False? Let's return False as data is missing.
             return False, f"Data file {file_path} not found."
 
         # Read data from YAML, handling the root key structure
+
         data_to_sync = []
         config_data_dict = {}
         try:
@@ -350,7 +365,10 @@ class GoogleSheetsSync:
                     print(
                         f"Warning: Expected dict structure for config.yaml, found {type(raw_data)}."
                     )
+
                     return False, "Invalid config.yaml format."
+
+                    return False, "Invalid config.yaml format." # Return message
 
             elif isinstance(raw_data, dict) and table_name in raw_data:
                 data_to_sync = raw_data[table_name]
@@ -358,8 +376,14 @@ class GoogleSheetsSync:
                     print(
                         f"Warning: Expected list under key '{table_name}' in {file_path}, found {type(data_to_sync)}."
                     )
+
                     data_to_sync = []
             elif isinstance(raw_data, list):
+
+                    data_to_sync = []  # Treat as empty if structure is wrong
+            elif isinstance(raw_data, list):
+                # Allow direct list structure as fallback?
+
                 print(
                     f"Warning: Reading direct list from {file_path}. Expected dict with key '{table_name}'."
                 )
@@ -368,31 +392,51 @@ class GoogleSheetsSync:
                 print(
                     f"Warning: Unexpected YAML structure in {file_path}. Cannot sync."
                 )
+
                 return False, f"Unexpected YAML structure in {file_path}."
+
+                return False, f"Unexpected YAML structure in {file_path}." # Return message
+
 
         except Exception as e:
             print(f"Error reading or parsing YAML file {file_path}: {e}")
             if hasattr(st, 'secrets'):
                 st.error(f"Error reading data file for {table_name}: {e}")
+
             return False, f"Error reading YAML file {file_path}."
 
+        # Get the expected headers
+
+            return False, f"Error reading YAML file {file_path}." # Return message
+
         # Get the expected headers for this sheet
+
         expected_headers = EXPECTED_HEADERS.get(table_name)
         if not expected_headers:
             print(f"Error: No expected headers defined for table '{table_name}'.")
             if hasattr(st, 'secrets'):
-                st.error(f"Configuration error: Headers missing for {table_name}.")
+                st.error(f"Configuration error: Headers missing for {table_name}."
+                         )
+
             return False, f"Headers missing for {table_name}."
+
+            return False, f"Headers missing for {table_name}." # Return message
+
 
         # --- Sync Logic --- 
         try:
             if table_name == 'config':
+
+                # Config: Always overwrite
+
                 # Config: Overwrite sheet with key-value pairs
+
                 print(
                     f"Syncing config data (overwrite) to sheet '{TABLE_MAP[table_name]}'."
                 )
                 values_to_update = [expected_headers]  # Start with header row
                 for key, value in config_data_dict.items():
+
                     values_to_update.append([str(key), str(value)])
 
                 worksheet.clear()
@@ -403,119 +447,170 @@ class GoogleSheetsSync:
                 print(msg)
                 return True, msg
 
-            # Activities, Followups, Users: Overwrite or Incremental Append
-            if not data_to_sync:
-                msg = f"No data entries found in {file_path} for {table_name}. Nothing to sync."
-                print(msg)
-                # If overwriting, clear the sheet
-                if not incremental:
-                     print(f"Clearing sheet '{TABLE_MAP[table_name]}' as part of overwrite sync.")
-                     worksheet.clear()
-                     worksheet.update('A1', [expected_headers], value_input_option='USER_ENTERED')
-                return True, msg
-
-            # Prepare data rows from YAML
-            yaml_rows = []
-            yaml_ids = set()
-            id_column_index = expected_headers.index('id') if 'id' in expected_headers else -1
-
-            for item in data_to_sync:
-                if not isinstance(item, dict):
-                    print(
-                        f"Warning: Skipping non-dict item in {table_name} data: {item}"
-                    )
-                    continue
-
-                # Ensure ID exists (especially for users)
-                if id_column_index != -1 and 'id' not in item:
-                    if table_name == 'users':
-                        item['id'] = f"usr-{uuid.uuid4().hex[:8]}"
-                        print(
-                            f"Generated missing ID for user: {item.get('username', 'N/A')} -> {item['id']}"
-                        )
-                    else:
-                         print(f"Warning: Skipping item in {table_name} due to missing ID: {item}")
-                         continue # Skip items without ID if ID is expected
-                
-                item_id = item.get('id') if id_column_index != -1 else None
-                if item_id:
-                    yaml_ids.add(item_id)
-
-                row_values = []
-                for header in expected_headers:
-                    value = item.get(header, "")
-                    formatted_value = self._format_value(value, header, table_name)
-                    row_values.append(formatted_value)
-                yaml_rows.append(row_values)
-
-            if not yaml_rows:
-                msg = f"No valid data rows prepared from YAML for {table_name}. Nothing to sync."
-                print(msg)
-                # If overwriting, clear the sheet
-                if not incremental:
-                     print(f"Clearing sheet '{TABLE_MAP[table_name]}' as part of overwrite sync.")
-                     worksheet.clear()
-                     worksheet.update('A1', [expected_headers], value_input_option='USER_ENTERED')
-                return True, msg
-
-            # --- Apply Sync Strategy --- 
-            if incremental and id_column_index != -1:
-                # Incremental Append: Get existing IDs from sheet
-                print(f"Performing incremental sync for {table_name}. Fetching existing IDs...")
-                try:
-                    # Get only the ID column (assuming it's the first column, index 1)
-                    # Adjust col_index if 'id' is not the first column
-                    id_col_letter = gspread.utils.rowcol_to_a1(1, id_column_index + 1).rstrip('1')
-                    existing_ids_raw = worksheet.col_values(id_column_index + 1)
-                    # Skip header row and remove potential leading quotes from formatted IDs
-                    existing_ids = {str(id_val).lstrip("'") for id_val in existing_ids_raw[1:] if id_val}
-                    print(f"Found {len(existing_ids)} existing IDs in sheet '{TABLE_MAP[table_name]}'.")
-                except Exception as e:
-                    msg = f"Error fetching existing IDs from sheet '{TABLE_MAP[table_name]}': {e}. Cannot perform incremental sync."
+            else:
+                # Activities, Followups, Users: Overwrite or Incremental Append
+                if not data_to_sync:
+                    msg = f"No data entries found in {file_path} for {table_name}. Nothing to sync."
                     print(msg)
-                    if hasattr(st, 'secrets'): st.error(msg)
-                    return False, msg
-
-                # Filter YAML rows to find new ones
-                rows_to_append = []
-                for row in yaml_rows:
-                    row_id = str(row[id_column_index]).lstrip("'") # Get ID from formatted row
-                    if row_id not in existing_ids:
-                        rows_to_append.append(row)
-                
-                if not rows_to_append:
-                    msg = f"No new records found in YAML for {table_name} to append incrementally."
-                    print(msg)
+                    # If overwriting, clear the sheet
+                    if not incremental:
+                         print(f"Clearing sheet '{TABLE_MAP[table_name]}' as part of overwrite sync.")
+                         worksheet.clear()
+                         worksheet.update('A1', [expected_headers], value_input_option='USER_ENTERED')
                     return True, msg
-                
-                # Append only the new rows
-                print(
-                    f"Appending {len(rows_to_append)} new rows incrementally to sheet '{TABLE_MAP[table_name]}'."
-                )
-                worksheet.append_rows(rows_to_append,
-                                      value_input_option='USER_ENTERED',
-                                      insert_data_option='INSERT_ROWS',
-                                      table_range='A1')
-                msg = f"Successfully appended {len(rows_to_append)} new rows for {table_name} incrementally."
+
+                # Prepare data rows from YAML
+                yaml_rows = []
+                yaml_ids = set()
+                id_column_index = expected_headers.index('id') if 'id' in expected_headers else -1
+
+
+                    # Ensure strings
+                    values_to_update.append([str(key), str(value)])
+
+                worksheet.clear()
+                # Use USER_ENTERED here, formatting is handled by _format_value if needed
+                worksheet.update(f'A1:B{len(values_to_update)}',
+                                 values_to_update,
+                                 value_input_option='USER_ENTERED') 
+                msg = f"Successfully synced {len(values_to_update)-1} config items."
                 print(msg)
-                return True, msg
+                return True, msg # Return success and message
 
             else:
-                # Overwrite Sync
+                # Activities, Followups, Users: Append new data
                 print(
-                    f"Performing overwrite sync for {table_name} with {len(yaml_rows)} rows."
+                    f"Syncing {table_name} data (append) to sheet '{TABLE_MAP[table_name]}'."
                 )
-                worksheet.clear()
-                # Prepare data including headers
-                data_to_write = [expected_headers] + yaml_rows
-                # Determine range dynamically
-                end_cell = gspread.utils.rowcol_to_a1(len(data_to_write), len(expected_headers))
-                worksheet.update(f'A1:{end_cell}',
-                                 data_to_write,
-                                 value_input_option='USER_ENTERED')
-                msg = f"Successfully synced {len(yaml_rows)} rows for {table_name} (overwrite)."
-                print(msg)
-                return True, msg
+                if not data_to_sync:  # Check if list is empty
+                    msg = f"No data entries found in {file_path} for {table_name}. Nothing to append."
+                    print(msg)
+                    return True, msg  # Not an error, just nothing to do
+
+                # Check if sheet is empty or only has headers
+                all_vals = worksheet.get_all_values()
+                # Consider empty or only header row
+                is_sheet_empty = len(all_vals) <= 1
+
+                if is_sheet_empty:
+                    print(
+                        f"Sheet '{TABLE_MAP[table_name]}' appears empty. Writing headers first."
+                    )
+                    try:
+                        # Write headers normally
+                        worksheet.update('A1',
+                                         [expected_headers],
+                                         value_input_option='USER_ENTERED')
+                    except Exception as header_err:
+                        msg = f"Error writing headers to empty sheet '{TABLE_MAP[table_name]}': {header_err}"
+                        print(msg)
+                        if hasattr(st, 'secrets'):
+                            st.error(
+                                f"Could not initialize headers for sheet '{TABLE_MAP[table_name]}': {header_err}"
+                            )
+                        return False, msg  # Stop if headers can't be written
+
+                # Prepare data rows in the correct order
+                rows_to_append = []
+
+                for item in data_to_sync:
+                    if not isinstance(item, dict):
+                        print(
+                            f"Warning: Skipping non-dict item in {table_name} data: {item}"
+                        )
+                        continue
+
+
+                    # Ensure ID exists (especially for users)
+                    if id_column_index != -1 and 'id' not in item:
+                        if table_name == 'users':
+                            item['id'] = f"usr-{uuid.uuid4().hex[:8]}"
+                            print(
+                                f"Generated missing ID for user: {item.get('username', 'N/A')} -> {item['id']}"
+                            )
+                        else:
+                             print(f"Warning: Skipping item in {table_name} due to missing ID: {item}")
+                             continue # Skip items without ID if ID is expected
+                    
+                    item_id = item.get('id') if id_column_index != -1 else None
+                    if item_id:
+                        yaml_ids.add(item_id)
+
+                    row_values = []
+                    for header in expected_headers:
+                        value = item.get(header, "")
+                        formatted_value = self._format_value(value, header, table_name)
+                        row_values.append(formatted_value)
+                    yaml_rows.append(row_values)
+
+                if not yaml_rows:
+                    msg = f"No valid data rows prepared from YAML for {table_name}. Nothing to sync."
+                    print(msg)
+                    # If overwriting, clear the sheet
+                    if not incremental:
+                         print(f"Clearing sheet '{TABLE_MAP[table_name]}' as part of overwrite sync.")
+                         worksheet.clear()
+                         worksheet.update('A1', [expected_headers], value_input_option='USER_ENTERED')
+                    return True, msg
+
+                # --- Apply Sync Strategy --- 
+                if incremental and id_column_index != -1:
+                    # Incremental Append: Get existing IDs from sheet
+                    print(f"Performing incremental sync for {table_name}. Fetching existing IDs...")
+                    try:
+                        # Get only the ID column (assuming it's the first column, index 1)
+                        # Adjust col_index if 'id' is not the first column
+                        id_col_letter = gspread.utils.rowcol_to_a1(1, id_column_index + 1).rstrip('1')
+                        existing_ids_raw = worksheet.col_values(id_column_index + 1)
+                        # Skip header row and remove potential leading quotes from formatted IDs
+                        existing_ids = {str(id_val).lstrip("'") for id_val in existing_ids_raw[1:] if id_val}
+                        print(f"Found {len(existing_ids)} existing IDs in sheet '{TABLE_MAP[table_name]}'.")
+                    except Exception as e:
+                        msg = f"Error fetching existing IDs from sheet '{TABLE_MAP[table_name]}': {e}. Cannot perform incremental sync."
+                        print(msg)
+                        if hasattr(st, 'secrets'): st.error(msg)
+                        return False, msg
+
+                    # Filter YAML rows to find new ones
+                    rows_to_append = []
+                    for row in yaml_rows:
+                        row_id = str(row[id_column_index]).lstrip("'") # Get ID from formatted row
+                        if row_id not in existing_ids:
+                            rows_to_append.append(row)
+                    
+                    if not rows_to_append:
+                        msg = f"No new records found in YAML for {table_name} to append incrementally."
+                        print(msg)
+                        return True, msg
+                    
+                    # Append only the new rows
+                    print(
+                        f"Appending {len(rows_to_append)} new rows incrementally to sheet '{TABLE_MAP[table_name]}'."
+                    )
+                    worksheet.append_rows(rows_to_append,
+                                          value_input_option='USER_ENTERED',
+                                          insert_data_option='INSERT_ROWS',
+                                          table_range='A1')
+                    msg = f"Successfully appended {len(rows_to_append)} new rows for {table_name} incrementally."
+                    print(msg)
+                    return True, msg
+
+                else:
+                    # Overwrite Sync
+                    print(
+                        f"Performing overwrite sync for {table_name} with {len(yaml_rows)} rows."
+                    )
+                    worksheet.clear()
+                    # Prepare data including headers
+                    data_to_write = [expected_headers] + yaml_rows
+                    # Determine range dynamically
+                    end_cell = gspread.utils.rowcol_to_a1(len(data_to_write), len(expected_headers))
+                    worksheet.update(f'A1:{end_cell}',
+                                     data_to_write,
+                                     value_input_option='USER_ENTERED')
+                    msg = f"Successfully synced {len(yaml_rows)} rows for {table_name} (overwrite)."
+                    print(msg)
+                    return True, msg
 
         except gspread.exceptions.APIError as e:
             msg = f"Google Sheets API Error syncing {table_name}: {e}"
@@ -531,6 +626,7 @@ class GoogleSheetsSync:
                     f"An unexpected error occurred while syncing {table_name}: {e}"
                 )
             return False, msg
+
     def sync_all_data(self, incremental=False):
         """Sync all tables based on the TABLE_MAP.
         
